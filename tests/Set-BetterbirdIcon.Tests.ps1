@@ -84,7 +84,7 @@ Describe 'Icon sets' {
     It 'offers every dot colour and marks the one already on the icon' {
         @($DotColours.Keys) | Should -Be @('Amber', 'Gold', 'White', 'Pink', 'Purple', 'Red', 'Grey')
         Get-DotColourName (Join-Path $Root 'icons\blue\newmail.ico') | Should -Be 'Red'
-        Get-DotColourName (Join-Path $Root 'icons\green\newmail.ico') | Should -Be 'Amber'
+        Get-DotColourName (Join-Path $Root 'icons\green2\newmail.ico') | Should -Be 'Red'
         Get-DotColourName (Join-Path $Root 'icons\bb-green\newmail.ico') | Should -Be 'Amber'
         Get-DotColourName (Join-Path $Root 'icons\bb\newmail.ico') | Should -Be 'White'
         $unreadable = Join-Path $TestDrive 'not-an-icon.ico'
@@ -1115,8 +1115,8 @@ Describe 'A portable Betterbird, or one in your own folder' {
             Set-Content $StateFile '{"Icon":"green","InstallDir":"D:\\Where It Was\\core"}'
             # State as the tool left it before the move: icon installed, and in the data folder.
             New-Item -ItemType Directory -Path $CurrentDir -Force | Out-Null
-            Copy-Item (Join-Path $Root 'icons\green\messengerWindow.ico') $CurrentDir
-            Copy-Item (Join-Path $Root 'icons\green\messengerWindow.ico') $Target
+            Copy-Item (Join-Path $Root 'icons\green2\messengerWindow.ico') $CurrentDir
+            Copy-Item (Join-Path $Root 'icons\green2\messengerWindow.ico') $Target
             Install-Icon 'blue' $null 6>$null
             Restore-Originals 6>$null
             Get-Sha (Join-Path $Target 'messengerWindow.ico') | Should -Be (Get-Sha (Join-Path $Root 'icons\bb\messengerWindow.ico'))
