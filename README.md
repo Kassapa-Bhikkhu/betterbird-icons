@@ -1,4 +1,4 @@
-<img src="source/betterbird-blue.svg" alt="Betterbird icon in blue: a light blue to green bird on a dark disc" width="128">
+<img src="source/betterbird-blue.svg" alt="Betterbird icon in blue: a light blue to green bird on a dark circle" width="128">
 
 # Betterbird Icons
 
@@ -52,11 +52,11 @@ Then start Betterbird again.
 
 | Name         | Design                                   | New-mail icon |
 |--------------|------------------------------------------|:-------------:|
-| `blue`       | light blue to green bird on a dark disc (shown as "yours") | yes |
-| `green`      | green bird, grey ring                    | yes |
-| `green2`     | brighter green bird, grey ring           | yes |
-| `lightgrey`  | light grey bird, grey ring               | yes |
-| `uk`         | blue to yellow bird, grey ring           | yes |
+| `blue`       | light blue to green bird on a dark circle (shown as "yours") | yes |
+| `green`      | green bird, grey circle                    | yes |
+| `green2`     | brighter green bird, grey circle           | yes |
+| `lightgrey`  | light grey bird, grey circle               | yes |
+| `uk`         | blue to yellow bird, grey circle           | yes |
 | `bb`         | orange/red, the standard Betterbird icon | yes |
 | `bb-green`   | green/yellow glow                        | yes |
 | `newmail-sm` | small new-mail icon only                 | yes |
@@ -142,7 +142,7 @@ python tools/svg_to_ico.py my-logo.svg my-logo.ico
 .\Set-BetterbirdIcon.ps1 -Icon my-logo.ico
 ```
 
-**Redraw a logo picture as a clean SVG:** `trace_logo.py` takes a PNG of a logo built like Betterbird's (one light shape on a dark disc, each filled with a top-to-bottom colour gradient, on a transparent background) and redraws it as a vector: a true circle for the disc, smooth curves for the shape with sharp tips kept, and gradients sampled from the picture. It writes `<name>.svg` and a clean `<name>-clean.png`. This is how `source/betterbird-blue.svg` was made from a PNG with jagged, grey-fringed edges. Logos built differently (several colours, no disc) need a different approach, so check the result.
+**Redraw a logo picture as a clean SVG:** `trace_logo.py` takes a PNG of a logo built like Betterbird's (one light shape on a dark circle, each filled with a top-to-bottom colour gradient, on a transparent background) and redraws it as a vector: a true circle, smooth curves for the shape with sharp tips kept, and gradients sampled from the picture. It writes `<name>.svg` and a clean `<name>-clean.png`. This is how `source/betterbird-blue.svg` was made from a PNG with jagged, grey-fringed edges. Logos built differently (several colours, no circle) need a different approach, so check the result.
 
 ```
 python tools/trace_logo.py Better-Bird-Logo-Blue.png out
