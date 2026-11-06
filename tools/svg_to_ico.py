@@ -18,7 +18,7 @@ from pathlib import Path
 import resvg_py
 from PIL import Image
 
-SIZES = [16, 20, 24, 32, 40, 48, 64, 128, 256]
+SIZES = [16, 32, 48, 128, 256]
 
 
 def render(svg, size):
