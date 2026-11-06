@@ -1647,7 +1647,7 @@ function Set-MailPopup([string]$Name) {
     $wasReadOnly = $false
     try {
         if ((Get-MailPopupName) -eq $Name) {
-            Write-Done "Mail popup is already $Name."
+            Write-Done "Mail popup is already $($PopupLabels[$Name])."
             return
         }
         Assert-MailPopupEntries -Omni $omni
@@ -1659,7 +1659,7 @@ function Set-MailPopup([string]$Name) {
         $wasReadOnly = $file.IsReadOnly
         if ($wasReadOnly) { $file.IsReadOnly = $false }
         [IO.File]::Replace($tmp, $omni, [NullString]::Value)
-        Write-Done "Mail popup set to $Name."
+        Write-Done "Mail popup set to $($PopupLabels[$Name])."
         Write-Warn 'Quit Betterbird and open it again to see it. A Betterbird update puts the original bird back.'
     }
     catch {
@@ -1761,7 +1761,7 @@ function Show-Status {
         $popupText = 'not changed by this tool'
         try {
             $popup = Get-MailPopupName
-            if ($popup) { $popupText = $popup }
+            if ($popup) { $popupText = $PopupLabels[$popup] }
         }
         catch { $popupText = 'not changed by this tool' }
         Write-Host "  Mail popup:     $popupText"
