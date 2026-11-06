@@ -705,7 +705,7 @@ Describe 'A fresh install, which has no icon files' {
     }
 
     It 'creates the icon folder if it is missing, and is not stopped by a broken shortcut' {
-        { Install-Icon 'green' $null 6>$null } | Should -Not -Throw
+        { Install-Icon 'green2' $null 6>$null } | Should -Not -Throw
         Join-Path $Target 'messengerWindow.ico' | Should -Exist
         Restore-Originals 6>$null
     }
@@ -729,7 +729,7 @@ Describe 'A fresh install, which has no icon files' {
         Install-Icon 'blue' 'none'
         Join-Path $Target 'newmail.ico' | Should -Not -Exist
         (Read-State).NewMail | Should -Be 'none'
-        Install-Icon 'green' $null   # set with a new-mail icon after -NewMail none: backup must survive
+        Install-Icon 'green2' $null   # set with a new-mail icon after -NewMail none: backup must survive
         Get-Sha (Join-Path $BackupDir 'newmail.ico') | Should -Be (Get-Sha $own)
         Restore-Originals
         Get-Sha (Join-Path $Target 'newmail.ico') | Should -Be (Get-Sha $own)

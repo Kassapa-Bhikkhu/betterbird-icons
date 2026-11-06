@@ -143,7 +143,7 @@ $SetNotes = [ordered]@{
     'newmail-sm' = 'SeaMonkey new-mail icon only'
 }
 
-# New-mail dot colours. Amber matches green/bb-green, Red matches blue.
+# New-mail dot colours. Amber matches bb-green, Red matches blue.
 $DotColours = [ordered]@{
     Amber  = '#ff6000'
     Gold   = '#ffd700'

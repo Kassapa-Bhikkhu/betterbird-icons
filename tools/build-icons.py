@@ -28,7 +28,6 @@ _spec.loader.exec_module(svg_to_ico)
 # set name -> (main window design, new-mail design or None)
 SVG_SETS = {
     "blue": ("betterbird-blue.svg", "betterbird-unread-blue.svg"),
-    "green": ("betterbird-green.svg", "betterbird-unread-green.svg"),
     "lightgrey": ("betterbird-lightgrey.svg", "betterbird-unread-lightgrey.svg"),
     "green2": ("betterbird-green2.svg", "betterbird-unread-green2.svg"),
     "uk": ("betterbird-uk.svg", "betterbird-unread-uk.svg"),
