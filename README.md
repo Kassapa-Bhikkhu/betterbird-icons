@@ -50,16 +50,15 @@ Then start Betterbird again.
 
 ## Icon sets
 
-| Name         | Design                                   | New-mail icon |
-|--------------|------------------------------------------|:-------------:|
-| `blue`       | light blue to green bird on a dark circle (shown as "yours") | yes |
-| `green`      | green bird, grey circle                    | yes |
-| `green2`     | brighter green bird, grey circle           | yes |
-| `lightgrey`  | light grey bird, grey circle               | yes |
-| `uk`         | blue to yellow bird, grey circle           | yes |
-| `bb`         | orange/red, the standard Betterbird icon | yes |
-| `bb-green`   | green/yellow glow                        | yes |
-| `newmail-sm` | small new-mail icon only                 | yes |
+| Image                                                              | Name         | Design                                     |
+|--------------------------------------------------------------------|--------------|--------------------------------------------|
+| <img src="source/betterbird-blue.svg" alt="Blue icon">             | `blue`       | light blue to green gradient on a dark circle (shown as "yours") |
+| <img src="source/betterbird.svg" alt="BB original">                | `bb`         | orange/red, the standard Betterbird icon   |
+| <img src="source/betterbird-green.svg" alt="Green/yellow icon">    | `bb-green`   | green/yellow gradient                      |
+| <img src="source/betterbird-green2.svg" alt="Green icon">          | `green2`     | green only                 |
+| <img src="source/betterbird-uk.svg" alt="Blue/yellow icon">        | `uk`         | blue/yellow gradient (Ukrainian colours)   |
+| <img src="source/betterbird-lightgrey.svg" alt="Grey icon">        | `lightgrey`  | light grey for dark OS mode                |
+| <img src="source/newmail-sm.ico" alt="SM new-mail icon">           | `newmail-sm` | SeaMonkey new-mail icon only               |
 
 Every set has a new-mail icon: the same bird with a dot. `newmail-sm` is only a small new-mail picture, for option 6. `-NewMail none` uses Betterbird's own. Betterbird's built-in icon is the orange `bb` design. **Restore original icons** puts back what you had before, including any icon you had customised by hand.
 
@@ -73,7 +72,7 @@ All options can be combined. Run `Get-Help .\Set-BetterbirdIcon.ps1 -Full` for d
 .\Set-BetterbirdIcon.ps1 -MailPopup yours              # the blue bird on the large new-mail popup
 .\Set-BetterbirdIcon.ps1 -MailPopup factory            # Betterbird's own popup bird
 .\Set-BetterbirdIcon.ps1 -Icon C:\Icons\mine.ico       # a custom icon
-.\Set-BetterbirdIcon.ps1 -Icon green -NewMail none     # keep Betterbird's new-mail icon
+.\Set-BetterbirdIcon.ps1 -Icon green2 -NewMail none    # keep Betterbird's new-mail icon
 .\Set-BetterbirdIcon.ps1 -StartPage C:\Docs\manual.html
 .\Set-BetterbirdIcon.ps1 -StartPage Off                # back to the previous start page
 .\Set-BetterbirdIcon.ps1 -Restore                      # original icons, remove everything installed

@@ -134,14 +134,13 @@ if (-not $UserDesktop)   { $UserDesktop   = [Environment]::GetFolderPath('Deskto
 if (-not $UserStartMenu) { $UserStartMenu = [Environment]::GetFolderPath('StartMenu') }
 
 $SetNotes = [ordered]@{
-    'blue'       = 'light blue to green bird on a dark disc'
-    'green'      = 'green bird, grey ring'
-    'green2'     = 'brighter green bird, grey ring'
-    'lightgrey'  = 'light grey bird, grey ring'
-    'uk'         = 'blue to yellow bird, grey ring'
-    'bb'         = 'orange/red - like the standard Betterbird icon'
-    'bb-green'   = 'green/yellow glow'
-    'newmail-sm' = 'small new-mail icon'
+    'blue'       = 'light blue to green bird on a dark circle'
+    'bb'         = 'orange/red, the standard Betterbird icon'
+    'bb-green'   = 'green/yellow gradient'
+    'green2'     = 'green only, grey circle'
+    'uk'         = 'blue/yellow gradient'
+    'lightgrey'  = 'light grey for dark OS mode'
+    'newmail-sm' = 'SeaMonkey new-mail icon only'
 }
 
 # New-mail dot colours. Amber matches green/bb-green, Red matches blue.
