@@ -159,6 +159,10 @@ $PopupChoices = [ordered]@{
     'yours'   = 'light blue to green bird'
     'factory' = "Betterbird's own"
 }
+$PopupLabels = @{
+    'yours'   = 'blue'
+    'factory' = 'Betterbird'
+}
 $PopupFiles = [ordered]@{
     'chrome/messenger/content/branding/icon64.png'  = @{ File = 'icon64.png';  Size = 64 }
     'chrome/messenger/content/branding/icon128.png' = @{ File = 'icon128.png'; Size = 128 }
@@ -1733,7 +1737,6 @@ function Show-List([string]$Kind = 'all') {
     $i = 1
     foreach ($name in (Get-MenuIconSets $Kind)) {
         $note = $SetNotes[$name]
-        if ($name -eq 'blue') { $note = "yours - $note" }
         Write-Host ('    {0}) {1,-11} {2}' -f $i, $name, $note)
         $i++
     }
@@ -1813,7 +1816,7 @@ function Show-Manual {
         ''
         '  Mail popup'
         '    The large popup for a new message uses a picture built into Betterbird.'
-        '    In this tool, choose Change the mail popup. 1 is yours. 2 (factory) puts'
+        '    In this tool, choose Change the mail popup. 1 is the blue bird. 2 puts'
         '    Betterbird''s own bird back. Quit Betterbird and open it again.'
         '    A Betterbird update puts the original bird back, so choose it again afterwards.'
         '    Restoring the original icons does not change this popup.'
@@ -1982,7 +1985,7 @@ function Show-Menu {
                     $n = 1
                     foreach ($popupName in $PopupChoices.Keys) {
                         $mark = if ($popupName -eq $marked) { '    current' } else { '' }
-                        Write-Host ("    {0}) {1,-10} {2}{3}" -f $n, $popupName, $PopupChoices[$popupName], $mark)
+                        Write-Host ("    {0}) {1,-10} {2}{3}" -f $n, $PopupLabels[$popupName], $PopupChoices[$popupName], $mark)
                         $n++
                     }
                     $answer = "$(Read-Host '  Number')".Trim()
@@ -1991,12 +1994,12 @@ function Show-Menu {
                     if ($answer -notmatch '^\d+$' -or [int]$answer -lt 1 -or [int]$answer -gt $popupNames.Count) { throw "There is no mail popup $answer." }
                     $picked = $popupNames[[int]$answer - 1]
                     $asks = $Mode -eq 'system' -and -not (Test-Admin)
-                    Show-Working "Changing the mail popup to $picked." $asks
+                    Show-Working "Changing the mail popup to $($PopupLabels[$picked])." $asks
                     $script:Notes = @()
                     $changed = $false
                     if (-not $asks) { Set-MailPopup -Name $picked; $changed = $true }
                     else { $changed = Invoke-Elevated @{ MailPopup = $picked } }
-                    Set-MenuResult $changed "Changed the mail popup to $picked."
+                    Set-MenuResult $changed "Changed the mail popup to $($PopupLabels[$picked])."
                 }
                 { $_ -match '^[Qq]$' } { return }
             }

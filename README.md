@@ -42,7 +42,7 @@ I wrote this for my own Betterbird on Windows. I use it myself, and I have share
   Q) Quit
 ```
 
-Option 1 lists the icon sets by number; you can also type a set name or the path to your own `.ico` file. Number 1 is the blue icon (the tool marks it "yours": it is my own colouring). The new-mail icon is updated with that set. Options 6 and 8 work on the icon chosen with option 1, so choose one first. Option 7 opens a table of the pictures in your web browser.
+Option 1 lists the icon sets by number; you can also type a set name or the path to your own `.ico` file. Number 1 is the blue icon. The new-mail icon is updated with that set. Options 6 and 8 work on the icon chosen with option 1, so choose one first. Option 7 opens a table of the pictures in your web browser.
 
 For Betterbird installed for all users, only options 1, 3, 6, 8 and 9 ask for administrator permission, and only when you choose them. For a portable Betterbird, choose **P** and give its folder (the one with `BetterbirdLauncher.exe`); if no system-wide Betterbird is found, the tool asks for the folder straight away.
 
@@ -52,7 +52,7 @@ Then start Betterbird again.
 
 | Image                                                                                     | Name         | Design                                     |
 |-------------------------------------------------------------------------------------------|--------------|--------------------------------------------|
-| <img width="32" height="32" src="source/betterbird-blue.svg" alt="Blue icon">             | `blue`       | light blue to green gradient on a dark circle (shown as "yours") |
+| <img width="32" height="32" src="source/betterbird-blue.svg" alt="Blue icon">             | `blue`       | light blue to green gradient on a dark circle |
 | <img width="32" height="32" src="source/betterbird.svg" alt="BB original">                | `bb`         | orange/red, the standard Betterbird icon   |
 | <img width="32" height="32" src="source/betterbird-green.svg" alt="Green/yellow icon">    | `bb-green`   | green/yellow gradient                      |
 | <img width="32" height="32" src="source/betterbird-green2.svg" alt="Green icon">          | `green2`     | green only                                 |
