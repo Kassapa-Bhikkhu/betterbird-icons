@@ -18,7 +18,7 @@
     Quit Betterbird and open it again to see it. A Betterbird update puts that original bird back.
 
     Betterbird reads its window, taskbar and system tray icon when it starts, so close it before a
-    change (the menu offers to, and starts it again afterwards) or restart it afterwards.
+    change (menu options 1 and 2 offer to, and start it again afterwards) or restart it afterwards.
     Each icon change gives the shortcuts a new icon file name, so the desktop and taskbar shortcuts
     update by themselves. -RestartExplorer restarts Explorer if one still shows the old icon (open
     File Explorer windows close); it is never done as administrator.
@@ -56,8 +56,10 @@
     administrator window would run as administrator.
 
 .PARAMETER StartPage
-    The path to an .html file (or an http/https address) to show as Betterbird's start page,
-    or "Off" to go back to the previous start page. Only profiles Betterbird has used are changed.
+    What Betterbird shows when it starts: the path to an .html file (or an http/https address),
+    "Shortcuts" for the keyboard shortcuts page in this download (a copy is kept in each profile),
+    "Default" for Betterbird's own start page, or "Off" to put the previous start page back.
+    Only profiles Betterbird has used are changed.
     This is done with your normal rights, never as administrator.
 
 .PARAMETER Restore
@@ -95,6 +97,8 @@
     .\Set-BetterbirdIcon.ps1 -Icon C:\Icons\my-logo.ico -NewMail none
 .EXAMPLE
     .\Set-BetterbirdIcon.ps1 -StartPage C:\Docs\manual.html
+.EXAMPLE
+    .\Set-BetterbirdIcon.ps1 -StartPage Shortcuts
 .EXAMPLE
     .\Set-BetterbirdIcon.ps1 -Portable D:\BetterbirdPortable -Icon blue
 #>
@@ -145,6 +149,8 @@ $IconFiles  = @('messengerWindow.ico', 'newmail.ico')
 $IconStamp  = 'betterbird-icons.txt'   # next to our icons: their hashes
 $StartPrefs = 'mailnews\.start_page\.(url|enabled)'
 $SideFile   = 'betterbird-icons-startpage.txt'   # per profile: the previous start page
+$ShortcutsPage = Join-Path $PSScriptRoot 'pages\keyboard-shortcuts.html'   # what menu 8, C copies
+$ShortcutsFile = 'betterbird-icons-shortcuts.html'   # per profile: that copy, so the page doesn't depend on this download
 $Admins     = 'S-1-5-32-544'
 $System     = 'S-1-5-18'
 $NotSystemWide = 'Betterbird is not installed for all users (system-wide) in Program Files. For a portable ' +
@@ -488,7 +494,7 @@ function Remove-DataDir([switch]$KeepBackup) {
 }
 
 function Remove-OldDotFile {
-    # Before 2026-11-07 the dot icon was left in %LOCALAPPDATA%\BetterbirdIcons. Runs as the user.
+    # Older versions left the dot icon in %LOCALAPPDATA%\BetterbirdIcons. Runs as the user.
     if (-not $env:LOCALAPPDATA) { return }
     $dir = Join-Path $env:LOCALAPPDATA 'BetterbirdIcons'
     $file = Join-Path $dir 'dot-newmail.ico'
@@ -889,7 +895,7 @@ function Get-RelaunchArgs($Options) {
             # Pass full paths: the new window starts in another folder. Test-Path throws on
             # invalid path chars in Windows PowerShell.
             $isPath = $false
-            $word = ($kv.Key -eq 'NewMail' -and $value -in 'none', 'keep') -or ($kv.Key -eq 'StartPage' -and $value -eq 'Off')
+            $word = ($kv.Key -eq 'NewMail' -and $value -in 'none', 'keep') -or ($kv.Key -eq 'StartPage' -and $value -in 'Off', 'Default', 'Shortcuts')
             if ($kv.Key -in 'Icon', 'NewMail', 'StartPage', 'Portable' -and $value -and -not $word) {
                 # A set name like blue must not become a folder of that name.
                 $type = if ($kv.Key -eq 'Portable') { 'Container' } else { 'Leaf' }
@@ -961,7 +967,7 @@ function Invoke-Elevated($Options) {
     catch {
         $e = $_.Exception
         while ($e -and $e -isnot [ComponentModel.Win32Exception]) { $e = $e.InnerException }
-        if ($e -and $e.NativeErrorCode -eq 1223) { Write-Warn 'Administrator permission was not given, so the icons were not changed.' }   # ERROR_CANCELLED
+        if ($e -and $e.NativeErrorCode -eq 1223) { Write-Warn 'Administrator permission was not given, so nothing was changed.' }   # ERROR_CANCELLED
         else { Write-Warn "Couldn't start the administrator window, so the icons were not changed: $($_.Exception.Message)" }
         return $false
     }
@@ -969,7 +975,7 @@ function Invoke-Elevated($Options) {
     $deadline = (Get-Date).AddMinutes(3)
     while (-not (Test-Path -LiteralPath $exitFile)) {
         if ((Get-Date) -gt $deadline) {
-            Write-Warn 'The administrator window did not finish, so the icons may not have changed.'
+            Write-Warn 'The administrator window did not finish, so the change may not have been made.'
             return $false
         }
         Start-Sleep -Milliseconds 200
@@ -1351,7 +1357,7 @@ function Restore-Originals {
                 return
             }
         }
-        Write-Step 'Nothing to restore - this script has not changed the icons.'
+        Write-Step 'Nothing to restore - this tool has not changed the icons.'
         return
     }
     if (-not (Test-DataDirTrusted)) {
@@ -1537,7 +1543,7 @@ function Reset-Factory {
     }
     if ($saved) { Write-Warn "Icons this tool did not make were removed; a copy is in $saved." }
     if ($failed -gt 0) {
-        Write-Warn "$failed shortcut(s) could not be changed. Change their icon by hand (see -Manual)."
+        Write-Warn "$failed shortcut(s) could not be changed. Change their icon by hand (see 7, Show manual instructions)."
     }
     if ($failed -eq 0 -and $popupOk) { Write-Done "Betterbird is back to its own icons and mail popup. Start it again to see them." }
 }
@@ -1546,7 +1552,7 @@ function Reset-StartPageToPrevious {
     # The start page part of a factory reset: put back what was there before this tool, in
     # profiles it changed. A start page you set yourself stays.
     if (Test-Admin) {
-        Write-Warn 'The start page was left as it is: it is only changed with your normal rights. Use Start page, then Put the previous page back, from a normal window.'
+        Write-Warn 'The start page was left as it is: it is only changed with your normal rights. Use 8 (Change the start page), then E (Put the previous page back), from a normal window.'
         return
     }
     $profiles = @()
@@ -1672,27 +1678,81 @@ function Write-StartPageUserJsWarning([string]$ProfilePath) {
     }
 }
 
+function Get-FileUrl([string]$FullPath) {
+    # Built by hand: [Uri] treats # as a fragment and % as an escape.
+    $slashed = ($FullPath -replace '%', '%25' -replace '#', '%23') -replace '\\', '/'
+    ([Uri]$(if ($slashed.StartsWith('//')) { "file:$slashed" } else { "file:///$slashed" })).AbsoluteUri
+}
+
+function Assert-SafePrefValue([string]$Url) {
+    # Goes inside a quoted pref value: reject quotes, backslashes and control chars.
+    if ($Url -match '[\x00-\x1f"\\]') { throw "The start page address contains characters that aren't allowed." }
+}
+
+function Get-StartPageUrl([string]$PrefsText) {
+    $m = [regex]::Match($PrefsText, '(?m)^user_pref\("mailnews\.start_page\.url", "([^"]*)"')
+    if ($m.Success) { $m.Groups[1].Value } else { $null }
+}
+
+function Test-ShortcutsUrl([string]$Url) {
+    # The copy this tool makes, in whichever profile.
+    [bool]$Url -and $Url -match ('/' + [regex]::Escape($ShortcutsFile) + '$')
+}
+
+function Get-ShortcutsCopyPath([string]$ProfilePath) {
+    # Never write through a link. The temporary file is checked too: Write-Text writes it first.
+    $copy = Join-Path $ProfilePath $ShortcutsFile
+    foreach ($path in $copy, "$copy.betterbird-icons.tmp") {
+        if (Test-ReparsePoint $path) { throw "$path is a link; not changing it." }
+    }
+    $copy
+}
+
+function Copy-ShortcutsPage([string]$ProfilePath) {
+    # Each profile gets its own copy, so the page still works if this download is moved or deleted.
+    # Returns the address to use for it.
+    $copy = Get-ShortcutsCopyPath $ProfilePath
+    $url = Get-FileUrl $copy
+    Assert-SafePrefValue $url
+    Write-Text -Path $copy -Text ([IO.File]::ReadAllText($ShortcutsPage))
+    $url
+}
+
+function Remove-UnusedShortcutsCopy([string]$ProfilePath) {
+    # The copy stays only while the start page points at it. A link there isn't ours: left alone.
+    $copy = Join-Path $ProfilePath $ShortcutsFile
+    if (-not (Test-Path -LiteralPath $copy) -or (Test-ReparsePoint $copy)) { return }
+    if (Test-ShortcutsUrl (Get-StartPageUrl (Read-Text (Join-Path $ProfilePath 'prefs.js')))) { return }
+    Remove-Item -LiteralPath $copy -Force
+}
+
 function Set-StartPage([string]$Value) {
+    # A file or web address, or a word: Shortcuts (the keyboard shortcuts page), Default (Betterbird's
+    # own start page) or Off (put the previous page back).
     if (Test-Admin) { throw $NoAdminProfiles }
-    if ($Value -ne 'Off') {
+    $url = $null
+    if ($Value -eq 'Shortcuts') {
+        if (-not (Test-Path -LiteralPath $ShortcutsPage -PathType Leaf)) { throw "Can't find the keyboard shortcuts page: $ShortcutsPage" }
+    }
+    elseif ($Value -notin 'Off', 'Default') {
         if ($Value -match '^https?://') {
             $uri = $null
             if (-not [Uri]::TryCreate($Value, [UriKind]::Absolute, [ref]$uri)) { throw "$Value is not a valid web address." }
+            $url = $uri.AbsoluteUri
         }
         else {
             if (-not (Test-Path -LiteralPath $Value -PathType Leaf)) { throw "Can't find the start page file: $Value" }
             $full = (Resolve-Path -LiteralPath $Value).Path
             if ([IO.Path]::GetExtension($full) -notmatch '^\.html?$') { throw "$full is not an .html file." }
-            # Build the file URI by hand: [Uri] treats # as a fragment and % as an escape.
-            $slashed = ($full -replace '%', '%25' -replace '#', '%23') -replace '\\', '/'
-            $uri = [Uri]$(if ($slashed.StartsWith('//')) { "file:$slashed" } else { "file:///$slashed" })
+            $url = Get-FileUrl $full
         }
-        $url = $uri.AbsoluteUri
-        # Goes inside a quoted pref value: reject quotes, backslashes and control chars.
-        if ($url -match '[\x00-\x1f"\\]') { throw "The start page address contains characters that aren't allowed." }
+        Assert-SafePrefValue $url
     }
     $profiles = @(Get-StartPageProfiles)
+    # Before any profile is changed.
+    if ($Value -eq 'Shortcuts') { foreach ($p in $profiles) { [void](Get-ShortcutsCopyPath $p) } }
     foreach ($p in $profiles) {
+        $name = Split-Path $p -Leaf
         $side = Join-Path $p $SideFile
         $prefsText = Read-Text (Join-Path $p 'prefs.js')
         if ($Value -eq 'Off') {
@@ -1700,14 +1760,21 @@ function Set-StartPage([string]$Value) {
             # Restore the saved start page lines as they were.
             Write-ProfileStartPrefs -ProfilePath $p -PrefsText $prefsText -Lines @(Get-StartPrefLines (Read-Text $side))
             Remove-Item -LiteralPath $side
-            Write-Done "Start page set back to the previous one in $(Split-Path $p -Leaf)."
+            Write-Done "Start page set back to the previous one in $name."
         }
         else {
+            if ($Value -eq 'Shortcuts') { $url = Copy-ShortcutsPage $p }
             Save-PreviousStartPage -ProfilePath $p -PrefsText $prefsText
-            $lines = @('user_pref("mailnews.start_page.enabled", true);', "user_pref(`"mailnews.start_page.url`", `"$url`");")
+            # Default: no address, so Betterbird uses its own.
+            $lines = @('user_pref("mailnews.start_page.enabled", true);')
+            if ($url) { $lines += "user_pref(`"mailnews.start_page.url`", `"$url`");" }
             Write-ProfileStartPrefs -ProfilePath $p -PrefsText $prefsText -Lines $lines
-            Write-Done "Start page set in $(Split-Path $p -Leaf)."
+            $done = if ($Value -eq 'Default') { "Start page set to Betterbird's own in $name." }
+                    elseif ($Value -eq 'Shortcuts') { "Start page set to the keyboard shortcuts page in $name." }
+                    else { "Start page set in $name." }
+            Write-Done $done
         }
+        Remove-UnusedShortcutsCopy $p
         Write-StartPageUserJsWarning -ProfilePath $p
     }
 }
@@ -1745,30 +1812,31 @@ function Test-PreviousStartPageSaved {
     return $false
 }
 
-function Set-StartPageEnabled([bool]$On) {
-    # Show or hide the start page; the URL is kept.
+function Disable-StartPage {
+    # Hide the start page; the address is kept.
     $profiles = @(Get-StartPageProfiles)
-    $flag = if ($On) { 'true' } else { 'false' }
     foreach ($p in $profiles) {
         $prefsText = Read-Text (Join-Path $p 'prefs.js')
         Save-PreviousStartPage -ProfilePath $p -PrefsText $prefsText
         $urlLines = @(Get-StartPrefLines $prefsText | Where-Object { $_ -match 'start_page\.url' })
-        $lines = @("user_pref(`"mailnews.start_page.enabled`", $flag);") + @($urlLines)
+        $lines = @('user_pref("mailnews.start_page.enabled", false);') + @($urlLines)
         Write-ProfileStartPrefs -ProfilePath $p -PrefsText $prefsText -Lines $lines
-        $word = if ($On) { 'on' } else { 'off' }
-        Write-Done "Start page turned $word in $(Split-Path $p -Leaf)."
+        Write-Done "Start page turned off in $(Split-Path $p -Leaf)."
         Write-StartPageUserJsWarning -ProfilePath $p
     }
 }
 
 function Get-StartPageStatus([string]$InstallDir) {
     foreach ($p in @(Get-Profiles $InstallDir)) {
-        $m = [regex]::Match((Read-Text (Join-Path $p 'prefs.js')), '(?m)^user_pref\("mailnews\.start_page\.url", "([^"]*)"')
-        $value = if ($m.Success) { $m.Groups[1].Value } else { '(Betterbird default)' }
-        if (Test-Path -LiteralPath (Join-Path $p $SideFile)) { $value += '   (set by this script)' }
-        if ($m.Success -and $m.Groups[1].Value -like 'file:*') {
+        $url = Get-StartPageUrl (Read-Text (Join-Path $p 'prefs.js'))
+        if (Test-ShortcutsUrl $url) { $value = 'keyboard shortcuts page (this tool)' }
+        else {
+            $value = if ($url) { $url } else { '(Betterbird default)' }
+            if (Test-Path -LiteralPath (Join-Path $p $SideFile)) { $value += '   (set by this tool)' }
+        }
+        if ($url -like 'file:*') {
             $uri = $null
-            if ([Uri]::TryCreate($m.Groups[1].Value, [UriKind]::Absolute, [ref]$uri) -and -not (Test-Path -LiteralPath $uri.LocalPath)) {
+            if ([Uri]::TryCreate($url, [UriKind]::Absolute, [ref]$uri) -and -not (Test-Path -LiteralPath $uri.LocalPath)) {
                 $value += '   - FILE NOT FOUND'
             }
         }
@@ -2550,7 +2618,7 @@ function Show-Manual {
         ''
         '  If the old icon keeps showing'
         '    Betterbird reads its window, taskbar button and system tray icon when it starts: quit it'
-        '    completely (including the tray icon) and open it again. In this tool, the menu offers to do that'
+        '    completely (including the tray icon) and open it again. In this tool, options 1 and 2 offer to do that'
         '    before a change; -RestartBetterbird does the same from the command line.'
         '    If the desktop or taskbar shortcut still shows the old icon, Windows is keeping it in a cache until'
         '    Explorer restarts. Sign out and back in, or restart Windows. To do it at once: Ctrl+Shift+Esc,'
@@ -2563,6 +2631,9 @@ function Show-Manual {
         '    2. In the Start Page section, tick the option to show the Start Page when Betterbird launches,'
         '       and in Location enter a web address or a file, for example  file:///C:/Docs/manual.html'
         '    3. To go back, use Restore Default there, or untick the option.'
+        "    This download has a page of keyboard shortcuts:  $ShortcutsPage"
+        '    To use it as your start page, first copy it somewhere permanent (not this download, which you may'
+        '    delete later), then enter that copy in step 2.'
         ''
         '  Mail popup'
         '    The large popup for a new message uses a picture built into Betterbird.'
@@ -2740,23 +2811,25 @@ function Show-Menu {
                         'off'   { Write-Host '  It is off.' }
                         'mixed' { Write-Host '  It is on in some profiles and off in others.' }
                     }
-                    Write-Host '    1) Set a page'
-                    Write-Host '    2) Turn it on'
-                    Write-Host '    3) Turn it off'
+                    Write-Host '    A) Type a page (a file or a web address)'
+                    Write-Host '    B) Betterbird''s default start page'
+                    Write-Host '    C) Keyboard shortcuts page'
+                    Write-Host '    D) Turn the start page off'
                     $saved = Test-PreviousStartPageSaved
-                    if ($saved) { Write-Host '    4) Put the previous page back' }
-                    $answer = "$(Read-Host '  Number')".Trim()
+                    if ($saved) { Write-Host '    E) Put the previous page back' }
+                    $answer = "$(Read-Host '  Choose')".Trim()
                     if (-not $answer) { continue }
-                    if ($answer -eq '1') {
+                    if ($answer -eq 'A') {
                         $page = "$(Read-Host '  Path to the .html file (or an https:// address)')".Trim().Trim('"')
                         if (-not $page) { continue }
                         Set-StartPage $page
-                        $pause = $true
                     }
-                    elseif ($answer -eq '2') { Set-StartPageEnabled -On $true; $pause = $true }
-                    elseif ($answer -eq '3') { Set-StartPageEnabled -On $false; $pause = $true }
-                    elseif ($saved -and $answer -eq '4') { Set-StartPage 'Off'; $pause = $true }
+                    elseif ($answer -eq 'B') { Set-StartPage 'Default' }
+                    elseif ($answer -eq 'C') { Set-StartPage 'Shortcuts' }
+                    elseif ($answer -eq 'D') { Disable-StartPage }
+                    elseif ($saved -and $answer -eq 'E') { Set-StartPage 'Off' }
                     else { throw "There is no start page choice $answer." }
+                    $pause = $true
                 }
                 '9' { Clear-Host; Show-Status; $pause = $true }
                 { $_ -match '^[Dd]$' } {

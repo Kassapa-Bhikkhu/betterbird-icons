@@ -4,7 +4,7 @@
 
 [![Tests and code check](https://github.com/Kassapa-Bhikkhu/betterbird-icons/actions/workflows/tests.yml/badge.svg)](https://github.com/Kassapa-Bhikkhu/betterbird-icons/actions/workflows/tests.yml)
 
-Change the Betterbird icon on Windows to one of the alternative designs from [Betterbird's expert tips](https://www.betterbird.eu/expert-tips/#custom-icons), or a custom `.ico`. You can also change the system tray icon and its dot colour, change the "new mail" popup, and set a start page. Betterbird updates leave your icon alone.
+Change the Betterbird icon on Windows to one of the alternative designs from [Betterbird's expert tips](https://www.betterbird.eu/expert-tips/#custom-icons), or a custom `.ico`. You can also change the system tray icon and its dot colour, change the "new mail" popup, or quickly change the start page. Betterbird updates leave the changes alone. There is also a cmd commandline to the functions listed.
 
 Works with:
 
@@ -16,7 +16,7 @@ The menu's **Manual instructions** show how to make every change by hand instead
 
 ## Status
 
-This tool is experimental as in it is free and just for myself. It has been tested along the way, by myself and with automated tests in Windows PowerShell 5.1 and PowerShell 7 and on a real Betterbird on one Windows 11 PC, and its code has been audited several times - I have included one test folder. It still needs more testing, especially on other PCs, other Windows setups and other Betterbird versions. Check Betterbird after each change, and use **Revert to Betterbird defaults** (R) if something isn't right or to revert.
+This tool is experimental. I made it for my own use and share it free. I have tested it myself on a real Betterbird on one Windows 11 PC, and it has automated tests (in the `tests` folder) that run in Windows PowerShell 5.1 and PowerShell 7. Its code has been audited several times. It still needs more testing on other PCs, Windows setups and Betterbird versions. Check Betterbird after each change, and use **Revert to Betterbird defaults** (R) if something isn't right.
 
 ## Disclaimer
 
@@ -52,7 +52,12 @@ What each one does:
 5. **Change the "new mail" popup icon** offers every set, plus Betterbird's own. Only blue has a ready-made popup picture; for the others the tool draws one from the set's icon.
 6. **Show the icons for selection** opens a table of every set in your web browser, with the numbers the menu uses for the standard icon, the system tray icon and the popup.
 7. **Show manual instructions** shows how to make every change by hand.
-8. **Change the start page** sets, turns on, turns off or puts back Betterbird's start page.
+8. **Change the start page** sets what Betterbird shows when it starts:
+   - **A** a page you type, a file on your computer or a web address.
+   - **B** Betterbird's own start page.
+   - **C** a page of keyboard shortcuts, which comes with this tool.
+   - **D** turns the start page off.
+   - **E** puts the previous page back. It is listed only after this tool has changed the start page.
 9. **Show the current setup** shows the standard icon, system tray icon, popup, shortcuts and start page that are in place.
 D. **Debug issues** is for troubleshooting, separate from the icon changes. It asks `Go ahead? (Y/N)`, then closes Betterbird (if it is open) and restarts Windows Explorer (`explorer.exe`; open File Explorer windows close). It doesn't start Betterbird again. It only runs with your normal rights, never as administrator.
 R. **Revert to Betterbird defaults** goes back to Betterbird's own icons, popup and start page (see [Revert to Betterbird defaults](#revert-to-betterbird-defaults)).
@@ -60,17 +65,12 @@ S. **Select a different Betterbird folder** is for a portable Betterbird or one 
 
 For Betterbird installed for all users, only the items marked above ask for administrator permission, and only when you choose them.
 
-Before 1 and 2, if Betterbird is open, the menu asks, before any administrator prompt:
+Betterbird only shows a new window, taskbar and tray icon after it restarts. So before 1 and 2, if Betterbird is open, the tool asks whether to close it and start it again when the change is done:
 
-```
-  Betterbird is open. Its window, taskbar button and system tray icon keep the old picture until it restarts.
-  Close Betterbird now and start it again when the change is done? (Y/N)
-```
+- **Y** closes Betterbird, makes the change and starts Betterbird again. If Betterbird won't close (for example when it is minimised to the tray), the tool asks before forcing it closed, because anything unsaved, such as a message being written, would be lost.
+- **N** carries on with 2; restart Betterbird yourself later. 1 stops, because the popup can't be changed while Betterbird is open.
 
-- **Y** closes Betterbird in your own window the normal way. A Betterbird minimised to the system tray may not close that way: the tool then asks `Betterbird did not close. Force it closed? Anything unsaved, such as a message being written, will be lost. (Y/N)`, and only stops it on **Y**. When the change is done, Betterbird is started again from your own window (never from the administrator window): the portable launcher if there is one, otherwise `betterbird.exe`.
-- **N** carries on with 2 and tells you to restart Betterbird to see the new window, taskbar and system tray icon. 1 also changes the popup, which can't be changed while Betterbird holds `omni.ja` open, so **N** stops 1 before anything changes.
-- 3 and 4 don't ask: restart Betterbird afterwards to see the new tray icon. 5 stops with a message if Betterbird is open. R asks to close Betterbird itself.
-- If Betterbird isn't open, nothing is asked. Only the Betterbird you're changing counts: a portable one and an installed one are separate.
+3 and 4 don't ask: restart Betterbird afterwards to see the new tray icon. 5 stops with a message if Betterbird is open. R asks to close Betterbird.
 
 ## Icon sets
 
@@ -104,6 +104,8 @@ All options can be combined. Run `Get-Help .\Set-BetterbirdIcon.ps1 -Full` for d
 .\Set-BetterbirdIcon.ps1 -Icon blue -RestartBetterbird # close Betterbird first, start it again afterwards
 .\Set-BetterbirdIcon.ps1 -Icon blue -RestartExplorer   # and restart Explorer, if a shortcut still shows the old icon
 .\Set-BetterbirdIcon.ps1 -StartPage C:\Docs\manual.html
+.\Set-BetterbirdIcon.ps1 -StartPage Shortcuts          # the keyboard shortcuts page
+.\Set-BetterbirdIcon.ps1 -StartPage Default            # Betterbird's own start page
 .\Set-BetterbirdIcon.ps1 -StartPage Off                # back to the previous start page
 .\Set-BetterbirdIcon.ps1 -Restore                      # the icons you had before, remove everything installed
 .\Set-BetterbirdIcon.ps1 -FactoryReset                 # Betterbird's own icons, popup and start page (menu R)
@@ -121,7 +123,7 @@ If PowerShell refuses to run the script, use `Set-BetterbirdIcon.cmd` with the s
 ### Icons
 
 - Puts `messengerWindow.ico` (main window) and `newmail.ico` (new-mail notification) in `C:\Program Files\Betterbird\chrome\icons\default`. Betterbird doesn't ship these two files (its own icons are built into the program), so it uses them when they're there, and **updates leave them alone**. A small `betterbird-icons.txt` beside them records the hashes so a later run can tell them from icons you put there yourself. Restore removes it.
-- Points the Betterbird shortcuts (desktop, Start menu, pinned taskbar) at a copy of the same icon, named `shortcut-<letters and numbers>.ico` after its contents, in the data folder, and refreshes the Windows icon cache. The name changes whenever the picture does, because Windows keeps showing the old picture for a file name it has already seen. Older copies are deleted once every shortcut has moved to the new one. Every icon file the tool installs gets the current time as its file time, for the same reason.
+- Points the Betterbird shortcuts (desktop, Start menu, pinned taskbar) at a copy of the same icon in the data folder. The copy gets a new name each time the picture changes, so Windows shows the new picture straight away instead of one it remembers.
 - Changing only the system tray icon leaves the standard icon and the shortcuts alone; changing only the standard icon leaves the system tray icon alone.
 - Keeps any icon files that were already there in `C:\ProgramData\BetterbirdIcons\backup` (a folder only administrators can change), so **Restore** puts back what you had. On a fresh install there are none, so Restore simply removes the tool's icons.
 - If you change an icon file by hand after this tool has changed it, Restore leaves yours in place and keeps the older backup.
@@ -131,11 +133,9 @@ If PowerShell refuses to run the script, use `Set-BetterbirdIcon.cmd` with the s
 
 ### Icons still look old
 
-- Betterbird reads its window icon, taskbar button, system tray icon and popup when it starts, so a Betterbird that is already open keeps the old ones until it restarts. That is why the menu offers to close it before a change and start it again (see above). Quitting it completely, including the tray icon, and opening it again does the same by hand.
-- On the command line, `-RestartBetterbird` closes Betterbird before the change (it asks, or closes it at once with `-Force`; in a script without `-Force` it refuses) and starts it again afterwards, even if the change failed. On its own it just restarts Betterbird. Without it, the tool leaves Betterbird as it is and prints `Restart Betterbird to see the new window, taskbar and tray icon.` when it is open. `-FactoryReset` still closes Betterbird as before, and `-RestartBetterbird` starts it again afterwards.
-- The desktop, Start menu and taskbar shortcuts update by themselves, because each icon change gives them a new icon file name (above): Windows keeps showing the old picture for a file name it has already seen. If one still shows the old icon, restart Explorer: **T** in the menu does that (and restarts Betterbird), or add `-RestartExplorer` on the command line. Open File Explorer windows close.
-- Explorer and Betterbird are only ever restarted with your normal rights, from the normal window, never from the administrator window: one started as administrator would keep running as administrator. If you started the tool as administrator, it doesn't restart them and tells you.
-- Explorer: it stops the Explorer processes of your Windows session only, waits for Windows to start Explorer again, and starts `explorer.exe` from the Windows folder if that hasn't happened after a few seconds.
+- Betterbird shows a new window, taskbar and tray icon, and a new popup, only after it restarts. Quit it completely, including the tray icon, and open it again, or let options 1 and 2 do it for you.
+- The desktop, Start menu and taskbar shortcuts update by themselves. If one still shows the old icon, use **D** in the menu (it closes Betterbird and restarts Windows Explorer; open File Explorer windows close), or sign out and back in.
+- On the command line, `-RestartBetterbird` closes Betterbird before the change and starts it again afterwards, and `-RestartExplorer` restarts Explorer. Both only run with your normal rights, never as administrator, so Betterbird and Explorer never end up running as administrator.
 
 ### Dot colour
 
@@ -147,7 +147,7 @@ If PowerShell refuses to run the script, use `Set-BetterbirdIcon.cmd` with the s
 - The large popup for a new message uses two pictures inside `omni.ja` (`icon64.png` and `icon128.png`), not the icon files above.
 - **Change the "new mail" popup icon** (5), or `-MailPopup <set>`, replaces them with the bird of any icon set. Blue has a ready-made picture (`-MailPopup yours` is another name for blue); for the other sets the tool draws the two pictures (64 and 128 pixels, transparent background) from the largest picture in the set's `messengerWindow.ico`. The first time, it keeps Betterbird's own two pictures inside `omni.ja` as well. **Betterbird's own** (`-MailPopup factory`) puts exactly those back, so it always matches your Betterbird version. Option 1 changes the popup along with the icon.
 - It also leaves a small `betterbird-icons-popup.txt` inside `omni.ja`, saying which set the popup shows, so **Show the current setup** can tell you. It goes when Betterbird's own is put back.
-- Betterbird must be closed completely first, including its tray icon, because it keeps `omni.ja` open while it runs. The menu offers to close it (and start it again afterwards); if you say no, the change stops before anything is touched. Open Betterbird again to see the new popup.
+- Betterbird must be closed completely first, including its tray icon, because it keeps `omni.ja` open while it runs. If it is open, the change stops before anything is touched (option 1 offers to close it for you). Open Betterbird again to see the new popup.
 - A Betterbird update replaces `omni.ja` and brings the original bird back, so run it again after an update. `-Restore` does not change this popup; Revert to Betterbird defaults does.
 - Windows notifications (if you turn them on in Betterbird's settings) and calendar alarms use a different picture, `icon48.png`, which this tool doesn't change.
 
@@ -155,12 +155,19 @@ If PowerShell refuses to run the script, use `Set-BetterbirdIcon.cmd` with the s
 
 - Changes two settings in `prefs.js` in each profile Betterbird has used: `mailnews.start_page.url` (your page) and `mailnews.start_page.enabled`. Betterbird keeps its profiles in the same folder as Thunderbird, so the tool checks which program last used each profile, and never changes profiles Thunderbird used last or ones that were never opened.
 - Just before each change, a copy of `prefs.js` is saved as `prefs.js.betterbird-icons.bak` (replacing the copy from the change before).
-- **Turn it on** and **Turn it off** only show or hide that page. The address stays, so turning it on again uses the same one. **Status** says whether it's on or off.
-- The start page you had before is remembered (in `betterbird-icons-startpage.txt` in the profile). It comes back from **Start page**, then **Put the previous page back**, or with `-StartPage Off`. That choice appears only after this tool has changed the start page.
+- Menu 8 has five choices, with the command line for each:
+  - **A) Type a page**, a file or a web address: `-StartPage C:\Docs\manual.html`
+  - **B) Betterbird's default start page**: `-StartPage Default`
+  - **C) Keyboard shortcuts page**: `-StartPage Shortcuts`
+  - **D) Turn the start page off**. The address stays.
+  - **E) Put the previous page back**: `-StartPage Off`
+- A, B and C also turn the start page on. **Status** says whether it's on or off, and which page it uses.
+- The start page you had before is remembered (in `betterbird-icons-startpage.txt` in the profile). E brings it back. It is listed only after this tool has changed the start page.
+- C is [pages/keyboard-shortcuts.html](pages/keyboard-shortcuts.html): the most useful keys in three short lists (Mail, Writing a message, Address book), Betterbird's ReThread keys, and links to Betterbird's Expert tips and Mozilla's full list. It has a day look and a night look, and uses the one that matches the light or dark setting. The tool puts a copy in each profile, named `betterbird-icons-shortcuts.html`, and uses that copy, so the page keeps working if you move or delete this download. The copy is removed again when the start page no longer uses it.
 - The setting isn't locked: you can still change the start page in Betterbird's own settings at any time. Running the tool again replaces what's set there. If a `user.js` in the profile sets the start page, it wins over both, and the tool tells you.
 - Only ever done with your normal rights, never as administrator: profiles are your own files. Run as administrator, the tool refuses and asks you to use a normal window.
 - Betterbird must be closed while this runs, because it saves its settings when it exits. The tool offers to close it, and never closes it without asking, unless you add `-Force`.
-- The page is used where it is, so keep the HTML file where you chose it. **Status** warns if the file has been moved or deleted. [examples/start-page.html](examples/start-page.html) is a starting point.
+- A page you type (A) is used where it is, so keep the HTML file where you chose it. **Status** warns if a start page file has been moved or deleted.
 
 ### Revert to Betterbird defaults
 
@@ -170,14 +177,14 @@ If PowerShell refuses to run the script, use `Set-BetterbirdIcon.cmd` with the s
   - puts Betterbird's own mail popup back;
   - puts back the start page you had before this tool changed it. A start page you set yourself stays;
   - removes this tool's backups and records.
-- Betterbird must be closed; the tool offers to close it, and starts it again afterwards if you used the menu.
+- Betterbird must be closed; the tool offers to close it.
 - To go back to the icons you had before this tool, rather than to Betterbird's own, use `-Restore` on the command line.
 
 ### Portable Betterbird, or Betterbird in your own folder
 
 - The icons go in `core\chrome\icons\default` in the portable folder (or `chrome\icons\default` in your own install folder), and shortcuts to `BetterbirdLauncher.exe` are updated too.
 - For a portable Betterbird, the backups and the tool's record are kept in a `BetterbirdIcons` folder inside the portable folder, so they travel with it. For one installed in your own folder, they're kept in `%LOCALAPPDATA%\BetterbirdIcons`. That folder is shared, so if you have more than one Betterbird installed in your own folders, only one of them can have a changed icon at a time: Restore it before changing another.
-- The start page is changed in the portable profile (`profile`, or wherever the launcher has moved it). Start the portable Betterbird once first, so the profile exists.
+- The start page is changed in the portable profile (`profile`, or wherever the launcher has moved it). Start the portable Betterbird once first, so the profile exists. The keyboard shortcuts page is copied into that profile too. If you move the portable folder to another drive, choose C again.
 - Nothing needs administrator rights. If you start the tool as administrator anyway, it offers to start again as a standard user (recommended) or to continue as administrator (the start page is then left alone).
 - Only the Betterbird you're changing has to be closed; a separately installed Betterbird can stay open.
 
@@ -189,7 +196,7 @@ Two Python scripts in `tools/` for making your own icons. Install what they need
 pip install resvg-py pillow potracer numpy opencv-python
 ```
 
-**Make an icon from an SVG:** `svg_to_ico.py` turns a square SVG into a Windows `.ico` with every size Windows uses (16 to 256 px), each rendered fresh from the SVG so small sizes stay sharp. Use the result with `-Icon`:
+**Make an icon from an SVG:** `svg_to_ico.py` turns a square SVG into a Windows `.ico` with the sizes Windows needs (16, 32, 48, 128 and 256 px), each rendered fresh from the SVG so small sizes stay sharp. Use the result with `-Icon`:
 
 ```
 python tools/svg_to_ico.py my-logo.svg my-logo.ico

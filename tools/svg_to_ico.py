@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Turn an SVG into a Windows .ico with every size Windows uses (16-256 px), for use with
+Turn an SVG into a Windows .ico with the sizes Windows needs (16, 32, 48, 128 and 256 px), for use with
 Set-BetterbirdIcon.ps1 -Icon <file.ico>.
 
 Each size is rendered fresh from the SVG rather than scaled down from one big bitmap, so small

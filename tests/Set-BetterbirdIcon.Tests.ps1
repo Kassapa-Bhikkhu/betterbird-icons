@@ -346,6 +346,14 @@ Describe 'Safety checks' {
         $text | Should -Match ([regex]::Escape((Join-Path $Root 'icons')))
         $text | Should -Match 'updates leave these two files alone'
         $text | Should -Match 'Start page'
+        $text | Should -Match ([regex]::Escape((Join-Path $Root 'pages\keyboard-shortcuts.html')))
+        $text | Should -Match 'copy it somewhere permanent'
+    }
+
+    It 'explains the start page words in the help' {
+        $help = Get-Help (Join-Path $Root 'Set-BetterbirdIcon.ps1') -Full | Out-String
+        foreach ($word in 'Shortcuts', 'Default', 'Off') { $help | Should -Match ('"' + $word + '"') }
+        $help | Should -Match '-StartPage Shortcuts'
     }
 
     It 'reports a cancelled administrator prompt cleanly, and passes options safely' {
@@ -365,15 +373,18 @@ Describe 'Safety checks' {
         finally { Pop-Location }
         $relaunch | Should -Contain (Format-Arg (Join-Path $Root 'icons\blue\messengerWindow.ico'))
         $relaunch | Should -Contain '"none"'
-        # Files named 'none' and 'Off' in the current folder must not turn into paths.
+        # Files named 'none', 'Off', 'Default' and 'Shortcuts' in the current folder must not turn into paths.
         Push-Location $TestDrive
         try {
-            Set-Content (Join-Path $TestDrive 'none') 'x'; Set-Content (Join-Path $TestDrive 'Off') 'x'
+            foreach ($name in 'none', 'Off', 'Default', 'Shortcuts') { Set-Content (Join-Path $TestDrive $name) 'x' }
             $words = Get-RelaunchArgs @{ NewMail = 'none'; StartPage = 'Off' }
+            $pageWords = foreach ($word in 'Default', 'Shortcuts') { Get-RelaunchArgs @{ StartPage = $word } }
         }
         finally { Pop-Location }
         $words | Should -Contain '"none"'
         $words | Should -Contain '"Off"'
+        $pageWords | Should -Contain '"Default"'
+        $pageWords | Should -Contain '"Shortcuts"'
         $popupArgs = Get-RelaunchArgs @{ MailPopup = 'factory' }
         $popupArgs | Should -Contain '-MailPopup'
         $popupArgs | Should -Contain '"factory"'
@@ -606,6 +617,14 @@ Describe 'What runs where' {
         Should -Invoke Set-StartPage -Times 0
         Should -Invoke Install-Icon -Times 0
         Should -Invoke Restore-Originals -Times 0
+    }
+
+    It '-StartPage Default, Shortcuts and Off are done here, with the word as it is' {
+        foreach ($word in 'Default', 'Shortcuts', 'Off') {
+            Invoke-Tool @{ StartPage = $word }
+            Should -Invoke Set-StartPage -Times 1 -Exactly -ParameterFilter { $Value -eq $word }
+        }
+        Should -Invoke Invoke-Elevated -Times 0
     }
 
     It 'with administrator rights: changes the icon itself, but refuses a start page before changing anything' {
@@ -1244,8 +1263,8 @@ Describe 'Start page' {
         Mock Get-Profiles { throw 'must not look at profiles' }
         $before = Get-Prefs $PrefsA
         { Set-StartPage $Page } | Should -Throw '*never as administrator*'
-        { Set-StartPage 'Off' } | Should -Throw '*never as administrator*'
-        { Set-StartPageEnabled -On $true } | Should -Throw '*never as administrator*'
+        foreach ($word in 'Off', 'Default', 'Shortcuts') { { Set-StartPage $word } | Should -Throw '*never as administrator*' }
+        { Disable-StartPage } | Should -Throw '*never as administrator*'
         Get-Prefs $PrefsA | Should -Be $before
         (Show-Status 6>&1 | Out-String) | Should -Match 'without administrator rights to see it'
         Should -Invoke Get-Profiles -Times 0
@@ -1268,9 +1287,9 @@ Describe 'Start page' {
         Set-StartPage 'Off'
     }
 
-    It 'turns the start page off and on without changing the address' {
+    It 'turns the start page off without changing the address' {
         Set-StartPage 'https://example.net/keep'
-        Set-StartPageEnabled -On $false
+        Disable-StartPage
         foreach ($p in $PrefsA, $PrefsB) {
             Get-UrlLines $p | Should -Be 'user_pref("mailnews.start_page.url", "https://example.net/keep");'
             Get-Prefs $p | Should -Match ([regex]::Escape('user_pref("mailnews.start_page.enabled", false);'))
@@ -1278,34 +1297,9 @@ Describe 'Start page' {
         Get-Prefs (Join-Path $ProfileA $SideFile) | Should -Match ([regex]::Escape('"https://example.org"'))
         Get-StartPageMode | Should -Be 'off'
         (Get-StartPageStatus $FakeInstall) -join "`n" | Should -Match '\(off\)'
-        Set-StartPageEnabled -On $true
-        Get-Prefs $PrefsA | Should -Match ([regex]::Escape('user_pref("mailnews.start_page.enabled", true);'))
-        Get-UrlLines $PrefsA | Should -Be 'user_pref("mailnews.start_page.url", "https://example.net/keep");'
-        Get-StartPageMode | Should -Be 'on'
         Get-Prefs $PrefsT | Should -Be $PrefsTOriginal
         Set-StartPage 'Off'
         Get-UrlLines $PrefsA | Should -Be 'user_pref("mailnews.start_page.url", "https://example.org");'
-        Join-Path $ProfileA $SideFile | Should -Not -Exist
-    }
-
-    It 'turns on a start page that was already switched off' {
-        $off = "user_pref(`"mailnews.start_page.url`", `"https://example.org`");`r`n" +
-            "user_pref(`"mailnews.start_page.enabled`", false);`r`n"
-        [IO.File]::WriteAllText($PrefsA, "// Mozilla User Preferences`r`nuser_pref(`"mail.example`", 1);`r`n" + $off)
-        [IO.File]::WriteAllText($PrefsB, $off)
-        foreach ($dir in $ProfileA, $ProfileB) {
-            $side = Join-Path $dir $SideFile
-            if (Test-Path -LiteralPath $side) { Remove-Item -LiteralPath $side }
-        }
-        Get-StartPageMode | Should -Be 'off'
-        Test-PreviousStartPageSaved | Should -BeFalse
-        Set-StartPageEnabled -On $true
-        Get-Prefs $PrefsA | Should -Match ([regex]::Escape('user_pref("mail.example", 1);'))
-        Get-Prefs $PrefsA | Should -Match ([regex]::Escape('user_pref("mailnews.start_page.enabled", true);'))
-        Get-UrlLines $PrefsA | Should -Be 'user_pref("mailnews.start_page.url", "https://example.org");'
-        Test-PreviousStartPageSaved | Should -BeTrue
-        Set-StartPage 'Off'
-        Get-Prefs $PrefsA | Should -Match ([regex]::Escape('user_pref("mailnews.start_page.enabled", false);'))
         Join-Path $ProfileA $SideFile | Should -Not -Exist
     }
 
@@ -1313,6 +1307,197 @@ Describe 'Start page' {
         [IO.File]::WriteAllText($PrefsA, "user_pref(`"mailnews.start_page.enabled`", true);`r`n")
         [IO.File]::WriteAllText($PrefsB, "user_pref(`"mailnews.start_page.enabled`", false);`r`n")
         Get-StartPageMode | Should -Be 'mixed'
+    }
+}
+
+Describe 'Start page choices B and C: Betterbird''s own page, and the keyboard shortcuts page' {
+    BeforeAll {
+        $FakeInstall = 'C:\Program Files\Betterbird'
+        function Get-InstallDir { $FakeInstall }
+        $UserAppData = Join-Path $TestDrive 'ChoicesAppData'
+        $Tb = Join-Path $UserAppData 'Thunderbird'
+        $ProfileA = Join-Path $Tb 'Profiles\a.default'
+        $ProfileB = Join-Path $TestDrive 'Choices Elsewhere\b #1 100%.default'   # a space, # and % in the address
+        $ProfileT = Join-Path $Tb 'Profiles\t.thunderbird'   # used by Thunderbird
+        $ProfileN = Join-Path $Tb 'Profiles\n.never-used'    # never opened: no compatibility.ini
+        New-Item -ItemType Directory -Path $ProfileA, $ProfileB, $ProfileT, $ProfileN -Force | Out-Null
+        Set-Content (Join-Path $Tb 'profiles.ini') @(
+            '[Profile0]', 'Name=a', 'IsRelative=1', 'Path=Profiles/a.default', '',
+            '[Profile1]', 'Name=b', 'IsRelative=0', "Path=$ProfileB", '',
+            '[Profile2]', 'Name=t', 'IsRelative=1', 'Path=Profiles/t.thunderbird', '',
+            '[Profile3]', 'Name=n', 'IsRelative=1', 'Path=Profiles/n.never-used')
+        foreach ($p in $ProfileA, $ProfileB) {
+            Set-Content (Join-Path $p 'compatibility.ini') @('[Compatibility]', "LastAppDir=$FakeInstall")
+        }
+        Set-Content (Join-Path $ProfileT 'compatibility.ini') @('[Compatibility]', 'LastAppDir=C:\Program Files\Mozilla Thunderbird')
+        $PrefsT = Join-Path $ProfileT 'prefs.js'
+        $PrefsTOriginal = "user_pref(`"mailnews.start_page.url`", `"https://thunderbird.example`");`r`n"
+        [IO.File]::WriteAllText($PrefsT, $PrefsTOriginal)
+        $PrefsOriginal = "// Mozilla User Preferences`r`n" +
+            "user_pref(`"mail.example`", 1);`r`n" +
+            "user_pref(`"mailnews.start_page.url`", `"https://example.org`");`r`n"
+        $Page = Join-Path $TestDrive 'Choices Mine\mine.html'
+        New-Item -ItemType Directory -Path (Split-Path $Page) -Force | Out-Null
+        Set-Content $Page '<p>mine</p>'
+
+        function Get-Prefs([string]$Path) { [IO.File]::ReadAllText($Path) }
+        function Get-UrlLines([string]$Path) { @((Get-Prefs $Path) -split "`r?`n" | Where-Object { $_ -match 'start_page\.url' }) }
+    }
+
+    BeforeEach {
+        foreach ($p in $ProfileA, $ProfileB) {
+            [IO.File]::WriteAllText((Join-Path $p 'prefs.js'), $PrefsOriginal)
+            foreach ($leftover in $SideFile, $ShortcutsFile, 'prefs.js.betterbird-icons.bak', 'user.js') {
+                if (Test-Path -LiteralPath (Join-Path $p $leftover)) { Remove-Item -LiteralPath (Join-Path $p $leftover) -Force }
+            }
+        }
+    }
+
+    It 'C puts a copy of the page in each Betterbird profile and makes the copy the start page' {
+        Set-StartPage 'Shortcuts' 6>$null
+        foreach ($p in $ProfileA, $ProfileB) {
+            Get-Sha (Join-Path $p $ShortcutsFile) | Should -Be (Get-Sha $ShortcutsPage)
+            Get-Prefs (Join-Path $p 'prefs.js') | Should -Match ([regex]::Escape('user_pref("mailnews.start_page.enabled", true);'))
+            Get-Prefs (Join-Path $p 'prefs.js') | Should -Match ([regex]::Escape('user_pref("mail.example", 1);'))
+        }
+        $copyUrl = ([Uri](Join-Path $ProfileA $ShortcutsFile)).AbsoluteUri
+        Get-UrlLines (Join-Path $ProfileA 'prefs.js') | Should -Be "user_pref(`"mailnews.start_page.url`", `"$copyUrl`");"
+        Get-UrlLines (Join-Path $ProfileB 'prefs.js') | Should -BeLike '*/b%20%231%20100%25.default/betterbird-icons-shortcuts.html");'
+        # The page you had is kept, for E.
+        Get-Prefs (Join-Path $ProfileA $SideFile) | Should -Match ([regex]::Escape('"https://example.org"'))
+    }
+
+    It 'C leaves a Thunderbird profile and a never-used profile alone' {
+        Set-StartPage 'Shortcuts' 6>$null
+        Join-Path $ProfileT $ShortcutsFile | Should -Not -Exist
+        Join-Path $ProfileN $ShortcutsFile | Should -Not -Exist
+        Join-Path $ProfileN 'prefs.js' | Should -Not -Exist
+        Get-Prefs $PrefsT | Should -Be $PrefsTOriginal
+    }
+
+    It 'C overwrites a copy from before' {
+        foreach ($p in $ProfileA, $ProfileB) { [IO.File]::WriteAllText((Join-Path $p $ShortcutsFile), 'an old page') }
+        Set-StartPage 'Shortcuts' 6>$null
+        foreach ($p in $ProfileA, $ProfileB) {
+            Get-Sha (Join-Path $p $ShortcutsFile) | Should -Be (Get-Sha $ShortcutsPage)
+            "$(Join-Path $p $ShortcutsFile).betterbird-icons.tmp" | Should -Not -Exist
+        }
+    }
+
+    It 'C does not write through a link at the copy''s path, and changes nothing' {
+        $decoy = Join-Path $TestDrive 'ChoicesDecoy'
+        New-Item -ItemType Directory -Path $decoy | Out-Null
+        Set-Content (Join-Path $decoy 'keep.txt') 'must survive'
+        $before = Get-Prefs (Join-Path $ProfileA 'prefs.js')
+        # The link is in the second profile: the first one must be left alone too.
+        $link = Join-Path $ProfileB $ShortcutsFile
+        New-Item -ItemType Junction -Path $link -Target $decoy | Out-Null
+        try {
+            { Set-StartPage 'Shortcuts' 6>$null } | Should -Throw '*is a link*'
+            Get-Prefs (Join-Path $ProfileA 'prefs.js') | Should -Be $before
+            Join-Path $ProfileA $ShortcutsFile | Should -Not -Exist
+            Join-Path $ProfileA $SideFile | Should -Not -Exist
+            @(Get-ChildItem -LiteralPath $decoy).Name | Should -Be 'keep.txt'
+        }
+        finally { [IO.Directory]::Delete($link) }
+        # The temporary file the copy is written through counts too.
+        $tmpLink = "$(Join-Path $ProfileA $ShortcutsFile).betterbird-icons.tmp"
+        New-Item -ItemType Junction -Path $tmpLink -Target $decoy | Out-Null
+        try {
+            { Set-StartPage 'Shortcuts' 6>$null } | Should -Throw '*is a link*'
+            @(Get-ChildItem -LiteralPath $decoy).Name | Should -Be 'keep.txt'
+        }
+        finally { [IO.Directory]::Delete($tmpLink) }
+    }
+
+    It 'C says so, before changing anything, when the page is missing from the download' {
+        $ShortcutsPage = Join-Path $TestDrive 'not-there.html'
+        $before = Get-Prefs (Join-Path $ProfileA 'prefs.js')
+        { Set-StartPage 'Shortcuts' } | Should -Throw "*Can't find the keyboard shortcuts page*"
+        Get-Prefs (Join-Path $ProfileA 'prefs.js') | Should -Be $before
+        Join-Path $ProfileA $SideFile | Should -Not -Exist
+    }
+
+    It 'B takes the address away so Betterbird uses its own page, and E brings the previous page back' {
+        Set-StartPage 'Default' 6>$null
+        foreach ($p in $ProfileA, $ProfileB) {
+            $prefs = Get-Prefs (Join-Path $p 'prefs.js')
+            $prefs | Should -Not -Match 'start_page\.url'
+            $prefs | Should -Match ([regex]::Escape('user_pref("mailnews.start_page.enabled", true);'))
+            $prefs | Should -Match ([regex]::Escape('user_pref("mail.example", 1);'))
+        }
+        Get-Prefs (Join-Path $ProfileA $SideFile) | Should -Match ([regex]::Escape('"https://example.org"'))
+        Test-PreviousStartPageSaved | Should -BeTrue
+        (Get-StartPageStatus $FakeInstall) -join "`n" | Should -Match '\(Betterbird default\)'
+        Get-Prefs $PrefsT | Should -Be $PrefsTOriginal
+        Set-StartPage 'Off' 6>$null
+        Get-UrlLines (Join-Path $ProfileA 'prefs.js') | Should -Be 'user_pref("mailnews.start_page.url", "https://example.org");'
+        Get-Prefs (Join-Path $ProfileA 'prefs.js') | Should -Not -Match 'start_page\.enabled'
+        Join-Path $ProfileA $SideFile | Should -Not -Exist
+    }
+
+    It 'B and C turn on a start page that was switched off, and E puts the switch back' {
+        $off = $PrefsOriginal + "user_pref(`"mailnews.start_page.enabled`", false);`r`n"
+        foreach ($choice in 'Default', 'Shortcuts') {
+            foreach ($p in $ProfileA, $ProfileB) { [IO.File]::WriteAllText((Join-Path $p 'prefs.js'), $off) }
+            Get-StartPageMode | Should -Be 'off'
+            Set-StartPage $choice 6>$null
+            Get-StartPageMode | Should -Be 'on'
+            Set-StartPage 'Off' 6>$null
+            Get-StartPageMode | Should -Be 'off'
+        }
+    }
+
+    It 'takes the copy out again once the start page no longer uses it: <Leave>' -TestCases @(
+        @{ Leave = 'B (Betterbird''s own page)' }
+        @{ Leave = 'E (the previous page)' }
+        @{ Leave = 'A (a page you type)' }
+        @{ Leave = 'Revert to Betterbird defaults' }
+    ) {
+        param($Leave)
+        Set-StartPage 'Shortcuts' 6>$null
+        foreach ($p in $ProfileA, $ProfileB) { Join-Path $p $ShortcutsFile | Should -Exist }
+        switch -Wildcard ($Leave) {
+            'B *'      { Set-StartPage 'Default' 6>$null }
+            'E *'      { Set-StartPage 'Off' 6>$null }
+            'A *'      { Set-StartPage $Page 6>$null }
+            'Revert *' { Reset-StartPageToPrevious 6>$null }
+        }
+        foreach ($p in $ProfileA, $ProfileB) { Join-Path $p $ShortcutsFile | Should -Not -Exist }
+    }
+
+    It 'D (off) keeps the copy, because the address stays' {
+        Set-StartPage 'Shortcuts' 6>$null
+        Disable-StartPage 6>$null
+        foreach ($p in $ProfileA, $ProfileB) {
+            Join-Path $p $ShortcutsFile | Should -Exist
+            Get-Prefs (Join-Path $p 'prefs.js') | Should -Match ([regex]::Escape('user_pref("mailnews.start_page.enabled", false);'))
+            Get-Prefs (Join-Path $p 'prefs.js') | Should -Match 'betterbird-icons-shortcuts\.html'
+        }
+        (Get-StartPageStatus $FakeInstall) -join "`n" | Should -Match 'keyboard shortcuts page \(this tool\).*\(off\)'
+    }
+
+    It 'leaves a link at the copy''s path alone when it takes the copy out' {
+        $decoy = Join-Path $TestDrive 'ChoicesDecoy2'
+        New-Item -ItemType Directory -Path $decoy | Out-Null
+        Set-Content (Join-Path $decoy 'keep.txt') 'must survive'
+        $link = Join-Path $ProfileA $ShortcutsFile
+        New-Item -ItemType Junction -Path $link -Target $decoy | Out-Null
+        try {
+            Set-StartPage 'Default' 6>$null
+            Test-ReparsePoint $link | Should -BeTrue
+            @(Get-ChildItem -LiteralPath $decoy).Name | Should -Be 'keep.txt'
+        }
+        finally { [IO.Directory]::Delete($link) }
+    }
+
+    It 'Status shows the shortcuts page, and still warns when its file is gone' {
+        Set-StartPage 'Shortcuts' 6>$null
+        $status = (Get-StartPageStatus $FakeInstall) -join "`n"
+        $status | Should -Match 'keyboard shortcuts page \(this tool\)\s+\(on\)'
+        $status | Should -Not -Match 'FILE NOT FOUND|set by this tool'
+        Remove-Item -LiteralPath (Join-Path $ProfileA $ShortcutsFile)
+        (Get-StartPageStatus $FakeInstall) -join "`n" | Should -Match 'keyboard shortcuts page \(this tool\)\s+- FILE NOT FOUND'
     }
 }
 
@@ -1399,6 +1584,16 @@ Describe 'A portable Betterbird, or one in your own folder' {
             Set-StartPage 'https://after.example/'
             [IO.File]::ReadAllText((Join-Path $ProfileDir 'prefs.js')) | Should -Match 'https://after\.example/'
             Set-StartPage 'Off'
+            [IO.File]::ReadAllText((Join-Path $ProfileDir 'prefs.js')) | Should -Match 'https://before\.example'
+        }
+
+        It 'keeps the shortcuts page copy in the portable profile, and takes it out again' {
+            Set-StartPage 'Shortcuts' 6>$null
+            $copy = Join-Path $ProfileDir 'betterbird-icons-shortcuts.html'
+            Get-Sha $copy | Should -Be (Get-Sha $ShortcutsPage)
+            [IO.File]::ReadAllText((Join-Path $ProfileDir 'prefs.js')) | Should -Match 'betterbird-icons-shortcuts\.html'
+            Set-StartPage 'Off' 6>$null
+            $copy | Should -Not -Exist
             [IO.File]::ReadAllText((Join-Path $ProfileDir 'prefs.js')) | Should -Match 'https://before\.example'
         }
 
@@ -1613,12 +1808,53 @@ Describe 'The main menu' {
         Mock Get-StartPageMode { 'on' }
         Mock Test-PreviousStartPageSaved { $false }
         Mock Set-StartPage { }
-        Invoke-MenuWith @('6', '7', '', '8', '1', 'C:\x.html', '', '9', '') | Out-Null
+        Invoke-MenuWith @('6', '7', '', '8', 'A', 'C:\x.html', '', '9', '') | Out-Null
         Should -Invoke Open-IconPage -Times 1 -Exactly
         Should -Invoke Show-Manual -Times 1 -Exactly
         Should -Invoke Set-StartPage -Times 1 -Exactly -ParameterFilter { $Value -eq 'C:\x.html' }
         Should -Invoke Show-Status -Times 1 -Exactly
         Should -Invoke Invoke-Elevated -Times 0
+    }
+
+    It '8 lists A to D, and E only when a previous page is saved' {
+        Mock Get-StartPageMode { 'on' }
+        Mock Test-PreviousStartPageSaved { $false }
+        $text = Invoke-MenuWith @('8', '')
+        foreach ($line in 'A) Type a page (a file or a web address)', 'B) Betterbird''s default start page',
+                          'C) Keyboard shortcuts page', 'D) Turn the start page off') {
+            $text | Should -Match ([regex]::Escape($line))
+        }
+        $text | Should -Not -Match 'E\) Put the previous page back'
+        $text | Should -Not -Match 'Set a page|Turn it on|Turn it off'
+        Mock Test-PreviousStartPageSaved { $true }
+        Invoke-MenuWith @('8', '') | Should -Match 'E\) Put the previous page back'
+    }
+
+    It '8 then A, B, C, D and E: each choice does its own thing' {
+        Mock Get-StartPageMode { 'on' }
+        Mock Test-PreviousStartPageSaved { $true }
+        Mock Set-StartPage { }
+        Mock Disable-StartPage { }
+        # Letters in either case. After each change the menu waits for Enter (the empty answers).
+        Invoke-MenuWith @('8', 'A', '"C:\x.html"', '', '8', 'b', '', '8', 'C', '', '8', 'd', '', '8', 'E', '') | Out-Null
+        Should -Invoke Set-StartPage -Times 1 -Exactly -ParameterFilter { $Value -eq 'C:\x.html' }
+        Should -Invoke Set-StartPage -Times 1 -Exactly -ParameterFilter { $Value -eq 'Default' }
+        Should -Invoke Set-StartPage -Times 1 -Exactly -ParameterFilter { $Value -eq 'Shortcuts' }
+        Should -Invoke Set-StartPage -Times 1 -Exactly -ParameterFilter { $Value -eq 'Off' }
+        Should -Invoke Disable-StartPage -Times 1 -Exactly
+        Should -Invoke Invoke-Elevated -Times 0
+    }
+
+    It '8 refuses E when no previous page is saved, and the old numbers' {
+        Mock Get-StartPageMode { 'on' }
+        Mock Test-PreviousStartPageSaved { $false }
+        Mock Set-StartPage { }
+        Mock Disable-StartPage { }
+        $text = Invoke-MenuWith @('8', 'E', '', '8', '1', '')
+        $text | Should -Match 'There is no start page choice E\.'
+        $text | Should -Match 'There is no start page choice 1\.'
+        Should -Invoke Set-StartPage -Times 0
+        Should -Invoke Disable-StartPage -Times 0
     }
 
     It 'R goes through the confirmation and resets; N changes nothing' {
@@ -2561,7 +2797,7 @@ Describe 'Mail popup for any icon set' {
         Get-PopupMarkerSet $found | Should -BeNullOrEmpty
     }
 
-    It 'keeps the original saved when moving from blue made by an older version to another set' {
+    It 'never saves blue from an older version as Betterbird''s own, so factory then uses the copy that comes with the tool' {
         $dir = Join-Path $TestDrive 'PopupFromOldBlue'
         $omni = New-FakeOmni $dir
         $Mode = 'own'; $AppDir = $dir
@@ -2633,5 +2869,119 @@ Describe 'The preview page' {
     It 'points at this download folder when asked' {
         $html = Get-IconPageHtml -Absolute
         $html | Should -Match 'src="file:///[^"]*/icons/blue/messengerWindow\.ico"'
+    }
+}
+
+Describe 'The keyboard shortcuts page' {
+    BeforeAll {
+        $PagePath = Join-Path $Root 'pages\keyboard-shortcuts.html'
+        $Html = [IO.File]::ReadAllText($PagePath)
+
+        function ConvertTo-PlainText([string]$Fragment) {
+            ([Net.WebUtility]::HtmlDecode(($Fragment -replace '<[^>]+>', '')) -replace '\s+', ' ').Trim()
+        }
+        function Get-PageColours([string]$Block) {
+            $colours = [ordered]@{}
+            foreach ($m in [regex]::Matches($Block, '--([a-z-]+):\s*(#[0-9a-fA-F]{6});')) { $colours[$m.Groups[1].Value] = $m.Groups[2].Value }
+            $colours
+        }
+        function Get-Lightness([string]$Hex) {
+            # 0 is black, 255 is white.
+            $r = [Convert]::ToInt32($Hex.Substring(1, 2), 16); $g = [Convert]::ToInt32($Hex.Substring(3, 2), 16); $b = [Convert]::ToInt32($Hex.Substring(5, 2), 16)
+            (299 * $r + 587 * $g + 114 * $b) / 1000
+        }
+        function Get-Contrast([string]$A, [string]$B) {
+            # The WCAG contrast ratio of two colours.
+            $light = foreach ($hex in $A, $B) {
+                $c = foreach ($i in 1, 3, 5) {
+                    $v = [Convert]::ToInt32($hex.Substring($i, 2), 16) / 255
+                    if ($v -le 0.03928) { $v / 12.92 } else { [Math]::Pow(($v + 0.055) / 1.055, 2.4) }
+                }
+                0.2126 * $c[0] + 0.7152 * $c[1] + 0.0722 * $c[2]
+            }
+            $sorted = $light | Sort-Object -Descending
+            ($sorted[0] + 0.05) / ($sorted[1] + 0.05)
+        }
+    }
+
+    It 'is where the tool looks for it, and has its title' {
+        $PagePath | Should -Exist
+        $ShortcutsPage | Should -Be $PagePath
+        $Html | Should -Match '<title>Betterbird keyboard shortcuts</title>'
+        $Html | Should -Match '<h1>Betterbird keyboard shortcuts</h1>'
+    }
+
+    It 'is one self-contained page: no scripts, files, fonts or images, only the two links' {
+        $Html | Should -Not -Match '(?i)<(script|link|img|iframe|object|embed|form|base|video|audio|source)\b'
+        $Html | Should -Not -Match '(?i)\bsrc\s*='
+        $Html | Should -Not -Match '(?i)@import|@font-face|url\s*\('
+        $links = @([regex]::Matches($Html, '(?i)\bhref\s*=\s*"([^"]*)"') | ForEach-Object { $_.Groups[1].Value })
+        $links | Should -Be @('https://www.betterbird.eu/expert-tips/', 'https://support.mozilla.org/en-US/kb/keyboard-shortcuts-thunderbird')
+        @([regex]::Matches($Html, '(?i)https?://[^"\s<]+') | ForEach-Object { $_.Value }) | Should -Be $links
+        [regex]::IsMatch($Html, '[^\x00-\x7F]') | Should -BeFalse -Because 'it is plain ASCII, so the copy in a profile is exactly this file'
+    }
+
+    It 'has a day look and a night look, with the same colours set in both, readable in both' {
+        $day = Get-PageColours ([regex]::Match($Html, '(?s):root \{(.*?)\}').Groups[1].Value)
+        $night = Get-PageColours ([regex]::Match($Html, '(?s)@media \(prefers-color-scheme: dark\) \{\s*:root \{(.*?)\}').Groups[1].Value)
+        $day.Count | Should -BeGreaterThan 5
+        @($night.Keys) | Should -Be @($day.Keys)
+        foreach ($name in $day.Keys) { $night[$name] | Should -Not -Be $day[$name] -Because "the $name colour changes at night" }
+        $Html | Should -Match 'color-scheme: light dark'
+        $Html | Should -Match 'background: var\(--page\)'
+        Get-Lightness $day['page'] | Should -BeGreaterThan 200
+        Get-Lightness $night['page'] | Should -BeLessThan 60
+        foreach ($look in $day, $night) {
+            foreach ($pair in @('text', 'page'), @('text', 'card'), @('text', 'key'), @('muted', 'page'), @('muted', 'card'), @('link', 'page'), @('link', 'card')) {
+                Get-Contrast $look[$pair[0]] $look[$pair[1]] | Should -BeGreaterOrEqual 4.5 -Because "$($pair[0]) on $($pair[1])"
+            }
+        }
+    }
+
+    It 'lists exactly these shortcuts, in three tables' {
+        $expected = @'
+Mail|New message|Ctrl+N or Ctrl+M
+Mail|Reply|Ctrl+R
+Mail|Reply all|Ctrl+Shift+R
+Mail|Forward|Ctrl+L
+Mail|Get new messages|F5 (all accounts: Shift+F5)
+Mail|Search all mail|Ctrl+K
+Mail|Find in the message|Ctrl+F
+Mail|Next unread message|N
+Mail|Mark as read / unread|M
+Mail|Star (flag)|S
+Mail|Archive|A
+Mail|Delete|Del
+Mail|Open the address book|Ctrl+Shift+B
+Mail|Print|Ctrl+P
+Mail|ReThread mode (Betterbird only)|Ctrl+T, then arrow keys to pick the new parent and Ctrl+T again; Esc to leave
+Writing a message|Send now|Ctrl+Enter (send later: Ctrl+Shift+Enter)
+Writing a message|Bold / Italic / Underline|Ctrl+B / Ctrl+I / Ctrl+U
+Writing a message|Insert a link|Ctrl+K
+Writing a message|Larger font|Ctrl+> or Ctrl+.
+Writing a message|Smaller font|Ctrl+< or Ctrl+,
+Writing a message|Paste without formatting|Ctrl+Shift+V
+Writing a message|Check spelling|Ctrl+Shift+P
+Address book|New contact|Ctrl+N
+Address book|Write to the selected contacts|Ctrl+M
+Address book|Quick filter|Ctrl+F
+Address book|Advanced search|Ctrl+Shift+F
+'@ -split "`r?`n" | Where-Object { $_ }
+        $found = foreach ($section in [regex]::Matches($Html, '(?s)<h2>(.*?)</h2>\s*<table>(.*?)</table>')) {
+            $title = ConvertTo-PlainText $section.Groups[1].Value
+            foreach ($row in [regex]::Matches($section.Groups[2].Value, '(?s)<tr><th scope="row">(.*?)</th><td>(.*?)</td></tr>')) {
+                '{0}|{1}|{2}' -f $title, (ConvertTo-PlainText $row.Groups[1].Value), (ConvertTo-PlainText $row.Groups[2].Value)
+            }
+        }
+        ([regex]::Matches($Html, '<table>')).Count | Should -Be 3
+        $found | Should -Be $expected
+    }
+
+    It 'ends with the two links, to more tips and to the full list' {
+        $footer = [regex]::Match($Html, '(?s)<footer>(.*?)</footer>').Groups[1].Value
+        ConvertTo-PlainText $footer | Should -Be "More tips: Betterbird Expert tips All shortcuts: Mozilla's keyboard shortcuts list"
+        $footer | Should -Match '<a href="https://www\.betterbird\.eu/expert-tips/">Betterbird Expert tips</a>'
+        $footer | Should -Match '<a href="https://support\.mozilla\.org/en-US/kb/keyboard-shortcuts-thunderbird">Mozilla''s keyboard shortcuts list</a>'
+        $Html.LastIndexOf('</table>', [StringComparison]::Ordinal) | Should -BeLessThan $Html.IndexOf('<footer>', [StringComparison]::Ordinal)
     }
 }

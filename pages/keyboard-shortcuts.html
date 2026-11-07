@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="color-scheme" content="light dark">
+<title>Betterbird keyboard shortcuts</title>
+<style>
+  /* Day. The night colours are in the prefers-color-scheme block below. */
+  :root {
+    color-scheme: light dark;
+    --page: #f3f4f7;
+    --card: #ffffff;
+    --text: #1b1f27;
+    --muted: #566070;
+    --line: #dde1e8;
+    --key: #eef0f5;
+    --key-line: #b9c0cd;
+    --link: #a8480b;
+  }
+  /* Night */
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --page: #121418;
+      --card: #1b1e24;
+      --text: #e9ebf0;
+      --muted: #a3abb9;
+      --line: #2b3039;
+      --key: #262a32;
+      --key-line: #4a5262;
+      --link: #ffa563;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 2rem 1.25rem 3rem;
+    background: var(--page);
+    color: var(--text);
+    font: 1rem/1.5 "Segoe UI", system-ui, sans-serif;
+  }
+  main { max-width: 44rem; margin: 0 auto; }
+  h1 { margin: 0 0 .25rem; font-size: 1.6rem; }
+  .lead { margin: 0 0 1.5rem; color: var(--muted); }
+  section {
+    margin: 0 0 1.25rem;
+    padding: .1rem 1.1rem .5rem;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: .6rem;
+  }
+  h2 { margin: .9rem 0 .4rem; font-size: 1.1rem; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { padding: .45rem 0; border-top: 1px solid var(--line); text-align: left; vertical-align: top; }
+  tr:first-child th, tr:first-child td { border-top: 0; }
+  th { width: 42%; padding-right: 1rem; font-weight: 400; }
+  kbd {
+    padding: .1em .4em;
+    background: var(--key);
+    border: 1px solid var(--key-line);
+    border-bottom-width: 2px;
+    border-radius: .3rem;
+    font: .9em Consolas, "Cascadia Mono", monospace;
+    white-space: nowrap;
+  }
+  footer { color: var(--muted); }
+  footer p { margin: .25rem 0; }
+  a { color: var(--link); }
+</style>
+</head>
+<body>
+<main>
+<h1>Betterbird keyboard shortcuts</h1>
+<p class="lead">The keys you will use most. Ctrl+N means hold Ctrl and press N.</p>
+
+<section>
+<h2>Mail</h2>
+<table>
+<tr><th scope="row">New message</th><td><kbd>Ctrl+N</kbd> or <kbd>Ctrl+M</kbd></td></tr>
+<tr><th scope="row">Reply</th><td><kbd>Ctrl+R</kbd></td></tr>
+<tr><th scope="row">Reply all</th><td><kbd>Ctrl+Shift+R</kbd></td></tr>
+<tr><th scope="row">Forward</th><td><kbd>Ctrl+L</kbd></td></tr>
+<tr><th scope="row">Get new messages</th><td><kbd>F5</kbd> (all accounts: <kbd>Shift+F5</kbd>)</td></tr>
+<tr><th scope="row">Search all mail</th><td><kbd>Ctrl+K</kbd></td></tr>
+<tr><th scope="row">Find in the message</th><td><kbd>Ctrl+F</kbd></td></tr>
+<tr><th scope="row">Next unread message</th><td><kbd>N</kbd></td></tr>
+<tr><th scope="row">Mark as read / unread</th><td><kbd>M</kbd></td></tr>
+<tr><th scope="row">Star (flag)</th><td><kbd>S</kbd></td></tr>
+<tr><th scope="row">Archive</th><td><kbd>A</kbd></td></tr>
+<tr><th scope="row">Delete</th><td><kbd>Del</kbd></td></tr>
+<tr><th scope="row">Open the address book</th><td><kbd>Ctrl+Shift+B</kbd></td></tr>
+<tr><th scope="row">Print</th><td><kbd>Ctrl+P</kbd></td></tr>
+<tr><th scope="row">ReThread mode (Betterbird only)</th><td><kbd>Ctrl+T</kbd>, then arrow keys to pick the new parent and <kbd>Ctrl+T</kbd> again; <kbd>Esc</kbd> to leave</td></tr>
+</table>
+</section>
+
+<section>
+<h2>Writing a message</h2>
+<table>
+<tr><th scope="row">Send now</th><td><kbd>Ctrl+Enter</kbd> (send later: <kbd>Ctrl+Shift+Enter</kbd>)</td></tr>
+<tr><th scope="row">Bold / Italic / Underline</th><td><kbd>Ctrl+B</kbd> / <kbd>Ctrl+I</kbd> / <kbd>Ctrl+U</kbd></td></tr>
+<tr><th scope="row">Insert a link</th><td><kbd>Ctrl+K</kbd></td></tr>
+<tr><th scope="row">Larger font</th><td><kbd>Ctrl+&gt;</kbd> or <kbd>Ctrl+.</kbd></td></tr>
+<tr><th scope="row">Smaller font</th><td><kbd>Ctrl+&lt;</kbd> or <kbd>Ctrl+,</kbd></td></tr>
+<tr><th scope="row">Paste without formatting</th><td><kbd>Ctrl+Shift+V</kbd></td></tr>
+<tr><th scope="row">Check spelling</th><td><kbd>Ctrl+Shift+P</kbd></td></tr>
+</table>
+</section>
+
+<section>
+<h2>Address book</h2>
+<table>
+<tr><th scope="row">New contact</th><td><kbd>Ctrl+N</kbd></td></tr>
+<tr><th scope="row">Write to the selected contacts</th><td><kbd>Ctrl+M</kbd></td></tr>
+<tr><th scope="row">Quick filter</th><td><kbd>Ctrl+F</kbd></td></tr>
+<tr><th scope="row">Advanced search</th><td><kbd>Ctrl+Shift+F</kbd></td></tr>
+</table>
+</section>
+
+<footer>
+<p>More tips: <a href="https://www.betterbird.eu/expert-tips/">Betterbird Expert tips</a></p>
+<p>All shortcuts: <a href="https://support.mozilla.org/en-US/kb/keyboard-shortcuts-thunderbird">Mozilla's keyboard shortcuts list</a></p>
+</footer>
+</main>
+</body>
+</html>
