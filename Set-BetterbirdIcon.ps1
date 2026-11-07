@@ -14,27 +14,46 @@
     so -Restore can always put it back.
 
     The large new-mail popup is a different picture, stored inside the program.
-    -MailPopup yours changes it. -MailPopup factory puts Betterbird's own bird back.
+    -MailPopup <set> changes it to that set's bird. -MailPopup factory puts Betterbird's own bird back.
     Quit Betterbird and open it again to see it. A Betterbird update puts that original bird back.
 
+    Betterbird reads its window, taskbar and system tray icon when it starts, so close it before a
+    change (the menu offers to, and starts it again afterwards) or restart it afterwards.
+    Each icon change gives the shortcuts a new icon file name, so the desktop and taskbar shortcuts
+    update by themselves. -RestartExplorer restarts Explorer if one still shows the old icon (open
+    File Explorer windows close); it is never done as administrator.
+
     Run with no options for a simple menu. Options can be combined; they run in the order
-    Restore, Icon, MailPopup, StartPage.
+    Restore, FactoryReset, MailPopup, Icon, StartPage.
 
     Works with Betterbird installed for all users (system-wide) in Program Files, which needs
     administrator rights, and with a portable Betterbird or one installed in your own folder
     (-Portable), which doesn't. -Manual shows how to make the same changes by hand.
 
 .PARAMETER Icon
-    An icon set name (see -List) or the path to your own .ico file.
+    An icon set name (see -List) or the path to your own .ico file. Leave it out with -NewMail
+    to change only the new-mail icon and keep the window icon as it is.
 
 .PARAMETER NewMail
-    The new-mail notification icon: a set name, the path to an .ico file, or "none" for
-    Betterbird's built-in one. Defaults to the chosen set's own new-mail icon; with a set that has
-    none, the new-mail icon you had before stays.
+    The new-mail notification icon: a set name, the path to an .ico file, "none" for
+    Betterbird's built-in one, or "keep" to leave the one in place. Defaults to the chosen set's
+    own new-mail icon. With your own .ico (or a set that has none), the new-mail icon you had
+    before using this tool comes back, or Betterbird's built-in one if you had none.
 
 .PARAMETER MailPopup
-    The picture on the large new-mail popup: "yours" or "factory".
-    "factory" puts Betterbird's own bird back.
+    The picture on the large new-mail popup: an icon set name (blue, bb, uk and so on), the path to
+    an .ico file, or "factory" for Betterbird's own bird. "yours" is another name for blue.
+    Only blue has a ready-made picture; for the others it is made from the set's icon.
+
+.PARAMETER RestartExplorer
+    Restart Explorer once the change is done, if the desktop or taskbar still show the old icon.
+    Open File Explorer windows close. Never done as administrator.
+
+.PARAMETER RestartBetterbird
+    Close Betterbird before the change (it asks first, or closes it at once with -Force) and start
+    it again afterwards, so its window, taskbar button and system tray icon show the new picture.
+    On its own it just restarts Betterbird. Never done as administrator: a Betterbird started from an
+    administrator window would run as administrator.
 
 .PARAMETER StartPage
     The path to an .html file (or an http/https address) to show as Betterbird's start page,
@@ -42,8 +61,14 @@
     This is done with your normal rights, never as administrator.
 
 .PARAMETER Restore
-    Put the original icons and shortcuts back and remove everything this script installed.
-    (The start page is separate: use -StartPage Off.)
+    Put back the icons and shortcuts you had before this script changed them, and remove
+    everything it installed. (The mail popup and start page are separate.)
+
+.PARAMETER FactoryReset
+    Put Betterbird back to its own pictures: remove the icon files from its icon folder (any that
+    this tool did not make are saved first), point the shortcuts at Betterbird's own icon, put
+    Betterbird's own mail popup back, put back the start page you had before this tool changed it,
+    and remove this tool's data.
 
 .PARAMETER Portable
     The folder of a portable Betterbird (the one holding BetterbirdLauncher.exe), or of a
@@ -53,11 +78,19 @@
     Show step-by-step instructions for making all of these changes by hand.
 
 .EXAMPLE
-    .\Set-BetterbirdIcon.ps1 -MailPopup yours
+    .\Set-BetterbirdIcon.ps1 -MailPopup uk
 .EXAMPLE
     .\Set-BetterbirdIcon.ps1 -MailPopup factory
 .EXAMPLE
     .\Set-BetterbirdIcon.ps1 -Icon blue
+.EXAMPLE
+    .\Set-BetterbirdIcon.ps1 -Icon green2 -MailPopup green2 -RestartBetterbird
+.EXAMPLE
+    .\Set-BetterbirdIcon.ps1 -Icon blue -RestartExplorer
+.EXAMPLE
+    .\Set-BetterbirdIcon.ps1 -Icon uk -NewMail keep
+.EXAMPLE
+    .\Set-BetterbirdIcon.ps1 -NewMail none
 .EXAMPLE
     .\Set-BetterbirdIcon.ps1 -Icon C:\Icons\my-logo.ico -NewMail none
 .EXAMPLE
@@ -72,6 +105,9 @@ param(
     [string]$MailPopup,
     [string]$StartPage,
     [switch]$Restore,
+    [switch]$FactoryReset,
+    [switch]$RestartExplorer,
+    [switch]$RestartBetterbird,
     [string]$Portable,
     [switch]$List,
     [switch]$Status,
@@ -118,6 +154,11 @@ $NotSystemWide = 'Betterbird is not installed for all users (system-wide) in Pro
 $NoAdminProfiles = 'The start page is changed with your normal rights, never as administrator. Run this again ' +
                    'from a normal window (for example by double-clicking Set-BetterbirdIcon.cmd).'
 $WindowsPowerShell = Join-Path $WindowsDir 'System32\WindowsPowerShell\v1.0\powershell.exe'
+# Started from an administrator window these would run as administrator.
+$NoAdminExplorer = 'Explorer was not restarted: this window runs as administrator, and Explorer would then run as administrator too. Sign out and back in, or restart Windows, to see the new icon.'
+$NoAdminBetterbird = 'Betterbird was not started again: this window runs as administrator, and Betterbird would then run as administrator too. Start it yourself.'
+$NoAdminDebug = 'This window runs as administrator, and Explorer would then run as administrator too. Run this again from a normal window (for example by double-clicking Set-BetterbirdIcon.cmd).'
+$PopupInUse = 'Betterbird is using that picture. Quit it completely, including the tray icon, then try again.'
 
 # 'system': Program Files install, needs admin.
 # 'own':    portable or per-user install, no admin.
@@ -128,6 +169,7 @@ $ProfileDir = $null   # portable: its profile
 # Messages for the next menu screen (D done, W warning, S step), cleared once shown.
 $script:Notes = @()
 $script:MenuNotice = $null
+$script:BetterbirdClosed = $false   # this run closed Betterbird, so it may start it again
 
 if (-not $UserAppData)   { $UserAppData   = $env:APPDATA }
 if (-not $UserDesktop)   { $UserDesktop   = [Environment]::GetFolderPath('Desktop') }
@@ -154,19 +196,18 @@ $DotColours = [ordered]@{
     Grey   = '#808080'
 }
 
-# Mail popup images. These live in omni.ja, not in the .ico files.
-$PopupChoices = [ordered]@{
-    'yours'   = 'light blue to green bird'
-    'factory' = "Betterbird's own"
-}
-$PopupLabels = @{
-    'yours'   = 'blue'
-    'factory' = 'Betterbird'
-}
+# Mail popup images. These live in omni.ja, not in the .ico files. Any window set can be the
+# popup; only blue (icons\popup\yours) and factory have ready-made pictures, the rest are drawn
+# from the set's window icon.
 $PopupFiles = [ordered]@{
     'chrome/messenger/content/branding/icon64.png'  = @{ File = 'icon64.png';  Size = 64 }
     'chrome/messenger/content/branding/icon128.png' = @{ File = 'icon128.png'; Size = 128 }
 }
+# Betterbird's own popup pictures are kept inside omni.ja under this suffix, so "factory" puts
+# back exactly what that build had. An update replaces omni.ja and drops them.
+$PopupSaved = '.betterbird-icons-original'
+# Also kept in omni.ja: which set the popup shows, with the hashes of the pictures it made.
+$PopupMarker = 'chrome/messenger/content/branding/betterbird-icons-popup.txt'
 
 # ---------------------------------------------------------------- helpers
 
@@ -285,7 +326,8 @@ function Test-DataDirTrusted {
     try {
         # No links: folders, state file or icon files.
         $entries = @($DataDir, $BackupDir, $CurrentDir, $StateFile) +
-                   @(foreach ($d in $BackupDir, $CurrentDir) { foreach ($name in $IconFiles) { Join-Path $d $name } })
+                   @(foreach ($d in $BackupDir, $CurrentDir) { foreach ($name in $IconFiles) { Join-Path $d $name } }) +
+                   @(Get-ShortcutIconFiles | ForEach-Object { $_.FullName })
         foreach ($e in $entries) { if (Test-ReparsePoint $e) { return $false } }
         if ($Mode -eq 'own') { return $true }   # user's own folder, own rights
         if (-not (Test-OnlyAdminsCanWrite $DataDir -CheckOwner)) { return $false }
@@ -430,13 +472,32 @@ function Remove-DataDir([switch]$KeepBackup) {
         if (Test-ReparsePoint $d) { continue }
         foreach ($name in $IconFiles) { Remove-Item -LiteralPath (Join-Path $d $name) -Force -ErrorAction SilentlyContinue }
     }
+    if (-not (Test-ReparsePoint $CurrentDir)) {
+        foreach ($f in @(Get-ShortcutIconFiles)) { Remove-Item -LiteralPath $f.FullName -Force -ErrorAction SilentlyContinue }
+    }
     Remove-Item -LiteralPath $StateFile -Force -ErrorAction SilentlyContinue
     foreach ($d in $BackupDir, $CurrentDir, $DataDir) {
         if ((Test-Path -LiteralPath $d) -and -not (Test-ReparsePoint $d) -and @(Get-ChildItem -LiteralPath $d -Force).Count -eq 0) {
             Remove-Item -LiteralPath $d -Force
         }
     }
-    if (Test-Path -LiteralPath $DataDir) { Write-Warn "Left $DataDir in place: it holds files this tool did not make." }
+    # A factory reset's saved icons (saved-*) are reported by Reset-Factory.
+    if ((Test-Path -LiteralPath $DataDir) -and @(Get-ChildItem -LiteralPath $DataDir -Force | Where-Object { $_.Name -notlike 'saved-*' }).Count -gt 0) {
+        Write-Warn "Left $DataDir in place: it holds files this tool did not make."
+    }
+}
+
+function Remove-OldDotFile {
+    # Before 2026-11-07 the dot icon was left in %LOCALAPPDATA%\BetterbirdIcons. Runs as the user.
+    if (-not $env:LOCALAPPDATA) { return }
+    $dir = Join-Path $env:LOCALAPPDATA 'BetterbirdIcons'
+    $file = Join-Path $dir 'dot-newmail.ico'
+    if ((Test-Path -LiteralPath $file) -and -not (Test-ReparsePoint $dir) -and -not (Test-ReparsePoint $file)) {
+        Remove-Item -LiteralPath $file -Force
+    }
+    if ((Test-Path -LiteralPath $dir) -and -not (Test-ReparsePoint $dir) -and @(Get-ChildItem -LiteralPath $dir -Force).Count -eq 0) {
+        Remove-Item -LiteralPath $dir -Force
+    }
 }
 
 function Remove-OldReapplyTask {
@@ -461,6 +522,20 @@ function Get-Betterbird {
 
 function Test-Interactive { -not [Console]::IsInputRedirected -and [Environment]::UserInteractive }
 
+function Stop-Betterbird {
+    # Closes it the normal way first. A Betterbird minimised to the tray has no main window, so that
+    # can fail: then, only if the user agrees, stop the process. $true once none is left.
+    Get-Betterbird | ForEach-Object { [void]$_.CloseMainWindow() }
+    for ($i = 0; $i -lt 30 -and @(Get-Betterbird).Count -gt 0; $i++) { Start-Sleep -Milliseconds 500 }
+    if (@(Get-Betterbird).Count -eq 0) { return $true }
+    if (-not (Test-Interactive)) { return $false }
+    $answer = Read-Host '  Betterbird did not close. Force it closed? Anything unsaved, such as a message being written, will be lost. (Y/N)'
+    if ($answer -notmatch '^[Yy]') { return $false }
+    Get-Betterbird | ForEach-Object { Stop-Process -Id $_.Id -Force }
+    for ($i = 0; $i -lt 10 -and @(Get-Betterbird).Count -gt 0; $i++) { Start-Sleep -Milliseconds 500 }
+    @(Get-Betterbird).Count -eq 0
+}
+
 function Close-Betterbird([string]$Why) {
     if (@(Get-Betterbird).Count -eq 0) { return }
     if (-not $Force) {
@@ -471,10 +546,36 @@ function Close-Betterbird([string]$Why) {
         $answer = Read-Host "  Betterbird is open and must be closed $Why. Close it now? (Y/N)"
         if ($answer -notmatch '^[Yy]') { throw 'Close Betterbird and run this again.' }
     }
-    Get-Betterbird | ForEach-Object { [void]$_.CloseMainWindow() }
-    for ($i = 0; $i -lt 30 -and @(Get-Betterbird).Count -gt 0; $i++) { Start-Sleep -Milliseconds 500 }
-    if (@(Get-Betterbird).Count -gt 0) { throw 'Betterbird did not close. Close it yourself and run this again.' }
+    if (-not (Stop-Betterbird)) { throw 'Betterbird did not close. Close it yourself and run this again.' }
+    $script:BetterbirdClosed = $true
     Write-Step 'Closed Betterbird.'
+}
+
+function Request-BetterbirdClosed([string]$StopMessage) {
+    # Menu, in the user's own window and before any administrator prompt. $true: it closed Betterbird,
+    # so the caller starts it again after the change. On N, a change that can't be made while it is
+    # open stops with -StopMessage; the others carry on and say to restart Betterbird.
+    if (@(Get-Betterbird).Count -eq 0) { return $false }
+    Write-Host ''
+    Write-Host '  Betterbird is open. Its window, taskbar button and system tray icon keep the old picture until it restarts.'
+    $answer = "$(Read-Host '  Close Betterbird now and start it again when the change is done? (Y/N)')".Trim()
+    if ($answer -match '^[Yy]') {
+        if (Stop-Betterbird) { Write-Step 'Closed Betterbird.'; return $true }
+        Write-Warn 'Betterbird is still open.'
+    }
+    if ($StopMessage) { throw $StopMessage }
+    $false
+}
+
+function Start-Betterbird {
+    # The portable launcher if there is one, else betterbird.exe. Only from the user's own window:
+    # started from an administrator window it would run as administrator.
+    if (Test-Admin) { Write-Warn $NoAdminBetterbird; return $false }
+    $exe = if ($Launcher) { $Launcher } else { Join-Path (Get-InstallDir) 'betterbird.exe' }
+    if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) { Write-Warn "Couldn't find $exe to start Betterbird again. Start it yourself."; return $false }
+    Start-Process -FilePath $exe
+    Write-Done 'Started Betterbird again.'
+    $true
 }
 
 function Get-IcoFrames([string]$Path) {
@@ -620,21 +721,56 @@ function Get-DotColourName([string]$Path) {
 }
 
 function Get-WindowIconPath([string]$Icon) {
+    # Own .ico first, so its path is never joined onto icons\.
+    if (Test-Path -LiteralPath $Icon -PathType Leaf) { return (Resolve-Path -LiteralPath $Icon).Path }
     $set = Join-Path $PSScriptRoot "icons\$Icon\messengerWindow.ico"
     if (Test-Path -LiteralPath $set) { return $set }
-    if (Test-Path -LiteralPath $Icon -PathType Leaf) { return (Resolve-Path -LiteralPath $Icon).Path }
     $null
 }
 
-function Get-CurrentNewMailPath([string]$Icon) {
-    # Installed new-mail icon, else the set's own.
+function Get-NewMailLabel([string]$Value) {
+    # For the record and Status: a set name, 'none', or what kind of file it was.
+    if (-not $Value -or -not (Test-Path -LiteralPath $Value -PathType Leaf)) { return $Value }
+    if ((Split-Path $Value -Leaf) -like 'betterbird-icons-dot-*.ico') {
+        $colour = Get-DotColourName $Value
+        if ($colour) { return "$colour dot" }
+    }
+    "your own file ($(Split-Path $Value -Leaf))"
+}
+
+function Format-NewMailText([string]$Value) {
+    # The recorded new-mail icon in words.
+    switch ($Value) {
+        'none'     { "Betterbird's own" }
+        'original' { 'the one you had before' }
+        default    { $Value }
+    }
+}
+
+function Get-CurrentNewMailPath {
+    # The installed new-mail (tray) icon, if there is one.
     try {
         $installed = Join-Path (Get-IconTarget (Get-InstallDir)) 'newmail.ico'
         if (Test-Path -LiteralPath $installed) { return $installed }
     } catch { $null = $_ }
-    $set = Join-Path $PSScriptRoot "icons\$Icon\newmail.ico"
-    if (Test-Path -LiteralPath $set) { return $set }
     $null
+}
+
+function Get-DotBasePath {
+    # The picture the dot goes on: the window icon this tool installed, else the one the record
+    # names, else Betterbird's own design.
+    try {
+        $dir = Get-InstallDir
+        if ((Get-InstalledIcon $dir).Kind -eq 'ours') { return (Join-Path (Get-IconTarget $dir) 'messengerWindow.ico') }
+    } catch { $null = $_ }
+    if (Test-DataDirTrusted) {
+        $state = Read-State
+        if ($state -and $state.Icon) {
+            $window = Get-WindowIconPath $state.Icon
+            if ($window) { return $window }
+        }
+    }
+    Join-Path $PSScriptRoot 'icons\bb\messengerWindow.ico'
 }
 
 function Test-IcoFile([string]$Path) {
@@ -663,9 +799,76 @@ function Resolve-IconFile([string]$Value, [string]$FileName) {
     return $null
 }
 
+function Initialize-ShellNotify {
+    if ('BetterbirdIcons.ShellNotify' -as [type]) { return }
+    Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+
+namespace BetterbirdIcons {
+    public static class ShellNotify {
+        [DllImport("shell32.dll", CharSet = CharSet.Unicode, EntryPoint = "SHChangeNotify")]
+        static extern void NotifyPath(int eventId, uint flags, string item1, IntPtr item2);
+
+        [DllImport("shell32.dll", EntryPoint = "SHChangeNotify")]
+        static extern void NotifyAll(int eventId, uint flags, IntPtr item1, IntPtr item2);
+
+        // SHCNE_UPDATEITEM, SHCNF_PATHW
+        public static void UpdateItem(string path) { NotifyPath(0x00002000, 0x0005, path, IntPtr.Zero); }
+
+        // SHCNE_ASSOCCHANGED, SHCNF_IDLIST
+        public static void AssocChanged() { NotifyAll(0x08000000, 0x0000, IntPtr.Zero, IntPtr.Zero); }
+    }
+}
+'@
+}
+
+function Send-ShellNotify([string]$Path) {
+    # Tell Explorer a shortcut changed; with no path, that icons changed everywhere.
+    # Only a hint, so never an error.
+    try {
+        Initialize-ShellNotify
+        if ($Path) { [BetterbirdIcons.ShellNotify]::UpdateItem($Path) }
+        else { [BetterbirdIcons.ShellNotify]::AssocChanged() }
+    }
+    catch { $null = $_ }
+}
+
 function Update-IconCache {
     $tool = Join-Path $env:SystemRoot 'System32\ie4uinit.exe'
     if (Test-Path -LiteralPath $tool) { & $tool -show 2>$null }
+    Send-ShellNotify
+}
+
+function Copy-IconFile([string]$Source, [string]$Destination) {
+    # Windows caches icons by path and file time: a copy that keeps the old time can keep
+    # showing the old picture.
+    Copy-Item -LiteralPath $Source -Destination $Destination -Force
+    try {
+        $file = Get-Item -LiteralPath $Destination
+        $readOnly = $file.IsReadOnly
+        if ($readOnly) { $file.IsReadOnly = $false }
+        $file.LastWriteTime = Get-Date
+        if ($readOnly) { $file.IsReadOnly = $true }
+    }
+    catch { $null = $_ }
+}
+
+function Get-ShortcutIconFiles {
+    # current\shortcut-<12 hex>.ico: the file the shortcuts use, named after its contents.
+    if (-not (Test-Path -LiteralPath $CurrentDir) -or (Test-ReparsePoint $CurrentDir)) { return }
+    Get-ChildItem -LiteralPath $CurrentDir -File -Force -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -match '^shortcut-[0-9A-Fa-f]{12}\.ico$' }
+}
+
+function Test-OurShortcutIcon([string]$Location) {
+    # A shortcut icon this tool set: the old fixed file or a shortcut-*.ico, in current\.
+    if (-not $Location) { return $false }
+    $file = $Location -replace ',-?\d+$', ''
+    try { $dir = [IO.Path]::GetDirectoryName($file); $leaf = [IO.Path]::GetFileName($file) }
+    catch { return $false }
+    if (-not $dir -or -not $dir.TrimEnd('\').Equals($CurrentDir.TrimEnd('\'), [StringComparison]::OrdinalIgnoreCase)) { return $false }
+    $leaf -ieq 'messengerWindow.ico' -or $leaf -match '^shortcut-[0-9A-Fa-f]{12}\.ico$'
 }
 
 function Format-Arg([string]$Value) {
@@ -686,9 +889,14 @@ function Get-RelaunchArgs($Options) {
             # Pass full paths: the new window starts in another folder. Test-Path throws on
             # invalid path chars in Windows PowerShell.
             $isPath = $false
-            $word = ($kv.Key -eq 'NewMail' -and $value -eq 'none') -or ($kv.Key -eq 'StartPage' -and $value -eq 'Off')
+            $word = ($kv.Key -eq 'NewMail' -and $value -in 'none', 'keep') -or ($kv.Key -eq 'StartPage' -and $value -eq 'Off')
             if ($kv.Key -in 'Icon', 'NewMail', 'StartPage', 'Portable' -and $value -and -not $word) {
-                try { $isPath = Test-Path -LiteralPath $value } catch { $isPath = $false }
+                # A set name like blue must not become a folder of that name.
+                $type = if ($kv.Key -eq 'Portable') { 'Container' } else { 'Leaf' }
+                try { $isPath = Test-Path -LiteralPath $value -PathType $type } catch { $isPath = $false }
+            }
+            elseif ($kv.Key -eq 'MailPopup' -and $value) {
+                try { $isPath = [IO.Path]::GetExtension($value) -eq '.ico' -and (Test-Path -LiteralPath $value -PathType Leaf) } catch { $isPath = $false }
             }
             if ($isPath) { $value = (Resolve-Path -LiteralPath $value).ProviderPath }
             $pass += "-$($kv.Key)"; $pass += Format-Arg $value
@@ -784,10 +992,11 @@ function Invoke-AsStandardUser($Options) {
 }
 
 function Get-ElevatedOptions($Options) {
-    # Everything except StartPage.
+    # Everything except StartPage, RestartExplorer and RestartBetterbird.
     $elevated = @{}
     foreach ($kv in $Options.GetEnumerator()) {
-        if ($kv.Key -ne 'StartPage' -and $kv.Key -ne 'ExitFile') { $elevated[$kv.Key] = $kv.Value }
+        # Explorer and Betterbird are restarted by the normal window, never the administrator one.
+        if ($kv.Key -notin 'StartPage', 'ExitFile', 'RestartExplorer', 'RestartBetterbird') { $elevated[$kv.Key] = $kv.Value }
     }
     $elevated
 }
@@ -906,6 +1115,7 @@ function Save-ShortcutIcon($Shell, [string]$Path, [string]$IconLocation) {
         # Re-check right before saving in case it was swapped for a link.
         if (Test-ReparsePoint $Path) { Write-Warn "Skipped $Path - it is a link."; return $false }
         $lnk.Save()
+        Send-ShellNotify $Path
         return $true
     }
     catch { Write-Warn "Couldn't update the shortcut $Path ($($_.Exception.Message))"; return $false }
@@ -913,35 +1123,63 @@ function Save-ShortcutIcon($Shell, [string]$Path, [string]$IconLocation) {
 }
 
 function Set-ShortcutIcons($State, [string[]]$Exes) {
+    # Shortcuts get current\shortcut-<hash>.ico, a new path whenever the picture changes: Windows
+    # keeps showing the old picture for a path it has already seen. messengerWindow.ico stays
+    # for the backup logic and for shortcuts that still use it.
     $shell = New-Object -ComObject WScript.Shell
     $paths = @(@($State.Shortcuts) + @(Find-Shortcuts $Exes) | Where-Object { $_ } | Select-Object -Unique)
-    $icon = (Join-Path $CurrentDir 'messengerWindow.ico') + ',0'
+    $main = Join-Path $CurrentDir 'messengerWindow.ico'
+    $file = Join-Path $CurrentDir ('shortcut-{0}.ico' -f (Get-Hash $main).Substring(0, 12))
+    if ((Get-Hash $file) -ne (Get-Hash $main)) { Copy-IconFile $main $file }
+    $icon = $file + ',0'
     $kept = @()
+    $stillUsed = @{}   # our icon files that a shortcut we couldn't change still points at
     foreach ($p in $paths) {
         if (-not (Test-Path -LiteralPath $p)) { continue }
         try { $lnk = $shell.CreateShortcut($p) } catch { continue }
         if ($Exes -notcontains [Environment]::ExpandEnvironmentVariables($lnk.TargetPath)) { continue }
+        $before = $lnk.IconLocation
         if ($null -eq $State.OriginalShortcutIcons.PSObject.Properties[$p]) {
             # Ours but unrecorded (interrupted run): treat the default icon as the original.
-            $original = if ($lnk.IconLocation -like "$CurrentDir*") { ',0' } else { $lnk.IconLocation }
+            $original = if (Test-OurShortcutIcon $before) { ',0' } else { $before }
             $State.OriginalShortcutIcons | Add-Member -NotePropertyName $p -NotePropertyValue $original
         }
-        if ($lnk.IconLocation -ne $icon -and -not (Save-ShortcutIcon $shell $p $icon)) { continue }
+        if ($before -ne $icon -and -not (Save-ShortcutIcon $shell $p $icon)) {
+            if (Test-OurShortcutIcon $before) { $stillUsed[([IO.Path]::GetFileName(($before -replace ',-?\d+$', ''))).ToLowerInvariant()] = $true }
+            continue
+        }
         $kept += $p
+    }
+    # Older shortcut files go once every shortcut has moved.
+    foreach ($old in @(Get-ShortcutIconFiles)) {
+        if ($old.FullName -eq $file -or $stillUsed.ContainsKey($old.Name.ToLowerInvariant())) { continue }
+        if (-not (Test-ReparsePoint $old.FullName)) { Remove-Item -LiteralPath $old.FullName -Force -ErrorAction SilentlyContinue }
     }
     $State.Shortcuts = $kept
     return $kept.Count
 }
 
-function Restore-ShortcutIcons($State) {
-    # Only reset shortcuts still using our icon; leave ones changed since.
+function Restore-ShortcutIcons($State, [string[]]$Exes) {
+    # Only reset shortcuts still using our icon; leave ones changed since. Ones using our icon
+    # that the record doesn't list (record lost, interrupted run) get Betterbird's own icon.
+    # Returns how many couldn't be saved: their icon file must not be deleted.
     $shell = New-Object -ComObject WScript.Shell
-    $ours = (Join-Path $CurrentDir 'messengerWindow.ico') + ',0'
+    $failed = 0
+    $recorded = @()
     foreach ($prop in $State.OriginalShortcutIcons.PSObject.Properties) {
+        $recorded += $prop.Name
         if (-not (Test-Path -LiteralPath $prop.Name)) { continue }
         try { $now = $shell.CreateShortcut($prop.Name).IconLocation } catch { continue }
-        if ($now -eq $ours) { [void](Save-ShortcutIcon $shell $prop.Name ([string]$prop.Value)) }
+        if ((Test-OurShortcutIcon $now) -and -not (Save-ShortcutIcon $shell $prop.Name ([string]$prop.Value))) { $failed++ }
     }
+    if ($Exes) {
+        foreach ($p in @(Find-Shortcuts $Exes)) {
+            if ($recorded -contains $p) { continue }
+            try { $now = $shell.CreateShortcut($p).IconLocation } catch { continue }
+            if ((Test-OurShortcutIcon $now) -and -not (Save-ShortcutIcon $shell $p ',0')) { $failed++ }
+        }
+    }
+    $failed
 }
 
 # ---------------------------------------------------------------- icon actions
@@ -993,32 +1231,51 @@ function Backup-Originals([string]$Target) {
     }
 }
 
-function Copy-CurrentToInstall([string]$Target, [switch]$BuiltInNewMail) {
+function Copy-CurrentToInstall([string]$Target, [switch]$BuiltInNewMail, [switch]$KeepNewMail) {
     # Per file: ours, else the backup, else nothing (built-in icon).
-    # -BuiltInNewMail forces the built-in new-mail icon.
+    # -BuiltInNewMail forces the built-in new-mail icon; -KeepNewMail leaves it untouched.
     if (-not (Test-Path -LiteralPath $Target)) { New-Item -ItemType Directory -Path $Target -Force | Out-Null }
     foreach ($name in $IconFiles) {
+        if ($KeepNewMail -and $name -eq 'newmail.ico') { continue }
         $src = Join-Path $CurrentDir $name
         $dst = Join-Path $Target $name
         $backup = Join-Path $BackupDir $name
         if (Test-ReparsePoint $dst) { throw "$dst is a link; not changing it." }
         if (Test-Path -LiteralPath $dst) { (Get-Item -LiteralPath $dst).IsReadOnly = $false }   # v1 could set read-only
         if (Test-Path -LiteralPath $src) {
-            if ((Get-Hash $src) -ne (Get-Hash $dst)) { Copy-Item -LiteralPath $src $dst -Force }
+            if ((Get-Hash $src) -ne (Get-Hash $dst)) { Copy-IconFile $src $dst }
         }
         elseif ((Test-Path -LiteralPath $backup) -and -not ($BuiltInNewMail -and $name -eq 'newmail.ico')) {
-            Copy-Item -LiteralPath $backup $dst -Force
+            Copy-IconFile $backup $dst
         }
         else { Remove-Item -LiteralPath $dst -ErrorAction SilentlyContinue }
     }
 }
 
+function Restore-CurrentFromInstall([string]$Target, [string]$Name) {
+    # Keeping an icon this tool installed whose copy in current\ has been lost: take it back from
+    # the install folder, but only if the stamp says it is ours.
+    $current = Join-Path $CurrentDir $Name
+    $installed = Join-Path $Target $Name
+    if ((Test-Path -LiteralPath $current) -or -not (Test-Path -LiteralPath $installed)) { return }
+    $stamp = Read-IconStamp $Target
+    if ($stamp.ContainsKey($Name) -and $stamp[$Name] -eq (Get-Hash $installed)) { Copy-IconFile $installed $current }
+}
+
 function Install-Icon([string]$Value, [string]$NewMailValue) {
+    # $Value empty: keep the window icon as it is (only the new-mail icon changes).
+    # $NewMailValue empty: the set's own new-mail icon; none: Betterbird's own; keep: as it is.
+    $keepMain = -not $Value
+    $keepMail = $NewMailValue -eq 'keep'
+    if ($keepMain -and (-not $NewMailValue -or $keepMail)) { throw 'Nothing to change: give an icon, or a new-mail icon.' }
     $dir = Get-InstallDir
     $target = Get-IconTarget $dir
-    $main = Resolve-IconFile $Value 'messengerWindow.ico'
-    if (-not $main) { throw "'$Value' only has a new-mail icon. Use it with -NewMail instead." }
-    if ($NewMailValue -eq 'none') { $mail = $null }
+    $main = $null
+    if (-not $keepMain) {
+        $main = Resolve-IconFile $Value 'messengerWindow.ico'
+        if (-not $main) { throw "'$Value' only has a new-mail icon. Use it with -NewMail instead." }
+    }
+    if ($keepMail -or $NewMailValue -eq 'none') { $mail = $null }
     elseif ($NewMailValue) {
         $mail = Resolve-IconFile $NewMailValue 'newmail.ico'
         if (-not $mail) { throw "'$NewMailValue' has no new-mail icon." }
@@ -1037,24 +1294,35 @@ function Install-Icon([string]$Value, [string]$NewMailValue) {
     # Save InstallDir first so an interrupted run can still be restored.
     $state.InstallDir = $dir
     Save-State $state
+    if ($keepMain) { Restore-CurrentFromInstall $target 'messengerWindow.ico' }
+    if ($keepMail) { Restore-CurrentFromInstall $target 'newmail.ico' }
     Backup-Originals $target
 
-    Copy-Item -LiteralPath $main (Join-Path $CurrentDir 'messengerWindow.ico') -Force
-    if ($mail) { Copy-Item -LiteralPath $mail (Join-Path $CurrentDir 'newmail.ico') -Force }
-    else { Remove-Item -LiteralPath (Join-Path $CurrentDir 'newmail.ico') -ErrorAction SilentlyContinue }
+    if ($main) { Copy-IconFile $main (Join-Path $CurrentDir 'messengerWindow.ico') }
+    if ($mail) { Copy-IconFile $mail (Join-Path $CurrentDir 'newmail.ico') }
+    elseif (-not $keepMail) { Remove-Item -LiteralPath (Join-Path $CurrentDir 'newmail.ico') -ErrorAction SilentlyContinue }
 
-    Copy-CurrentToInstall $target -BuiltInNewMail:($NewMailValue -eq 'none')
+    Copy-CurrentToInstall $target -BuiltInNewMail:($NewMailValue -eq 'none') -KeepNewMail:$keepMail
     Write-IconStamp $target
-    $state.Icon = $Value
+    if (-not $keepMain) { $state.Icon = $Value }
     # 'none' = built-in; 'original' = whatever was there (set has no new-mail icon).
-    $state.NewMail = if ($mail) { if ($NewMailValue) { $NewMailValue } else { $Value } } elseif ($NewMailValue -eq 'none') { 'none' } else { 'original' }
+    if ($keepMail) { if (-not $state.NewMail) { $state.NewMail = 'original' } }
+    else { $state.NewMail = if ($mail) { if ($NewMailValue) { Get-NewMailLabel $NewMailValue } else { $Value } } elseif ($NewMailValue -eq 'none') { 'none' } else { 'original' } }
     Save-State $state   # icons in place; save before touching shortcuts
-    $n = Set-ShortcutIcons $state (Get-BetterbirdExes $dir)
-    Save-State $state
+    # Shortcuts show the window icon, which only exists in current\ if this tool installed one.
+    $n = 0
+    if (Test-Path -LiteralPath (Join-Path $CurrentDir 'messengerWindow.ico')) {
+        $n = Set-ShortcutIcons $state (Get-BetterbirdExes $dir)
+        Save-State $state
+    }
     Update-IconCache
 
-    Write-Done "Icon set to '$Value' (new-mail icon: $($state.NewMail)); $n shortcut(s) now use it."
-    if (@(Get-Betterbird).Count -gt 0) { Write-Warn 'Restart Betterbird to see the new icon.' }
+    if ($keepMain) { Write-Done "New-mail icon set to '$(Format-NewMailText $state.NewMail)'; the window icon is as it was." }
+    else {
+        $mailText = if ($keepMail) { 'as it was' } else { Format-NewMailText $state.NewMail }
+        Write-Done "Icon set to '$Value' (new-mail icon: $mailText); $n shortcut(s) now use it."
+    }
+    if (@(Get-Betterbird).Count -gt 0) { Write-Warn 'Restart Betterbird to see the new window, taskbar and tray icon.' }
 }
 
 function Restore-Originals {
@@ -1075,6 +1343,8 @@ function Restore-Originals {
                 }
             }
             if ($stamp.Count -gt 0) { Remove-IconStamp $target }
+            # Shortcuts still pointing at the lost data folder get Betterbird's own icon.
+            [void](Restore-ShortcutIcons (New-State) (Get-BetterbirdExes $dir))
             if ($removed) {
                 Update-IconCache
                 Write-Warn "Removed this tool's icons. The backup of your earlier icons is gone, so they could not be put back."
@@ -1089,15 +1359,24 @@ function Restore-Originals {
     }
     $state = Read-State
     if (-not ($state -and $state.InstallDir)) {
-        # No usable record, so we can't tell where the backup belongs: keep it.
-        if ($state) { Restore-ShortcutIcons $state }
-        if (Test-HasBackup) {
-            Write-Warn "This tool's record is missing, so your earlier icons were left in $BackupDir. Copy them back by hand (see -Manual)."
+        # No usable record. System-wide and portable each have their own data folder, so the
+        # backup belongs to the Betterbird found now. A per-user install shares it: keep it.
+        $found = $null
+        if (-not (Test-SharedOwnData)) { try { $found = Get-InstallDir } catch { $null = $_ } }
+        if (-not $found) {
+            if (-not $state) { $state = New-State }
+            if ((Restore-ShortcutIcons $state) -gt 0 -or (Test-HasBackup)) {
+                Remove-DataDir -KeepBackup
+                Write-Warn "This tool's record is missing, so your earlier icons were left in $BackupDir. Copy them back by hand (see -Manual)."
+                return
+            }
+            Remove-DataDir
+            Write-Done 'Nothing left to restore.'
             return
         }
-        Remove-DataDir
-        Write-Done 'Nothing left to restore.'
-        return
+        if (-not $state) { $state = New-State }
+        $state.InstallDir = $found
+        Write-Step "This tool's record was missing; restoring the Betterbird in $found."
     }
     # Recorded InstallDir (written elevated), so this still works after an uninstall.
     $dir = [string]$state.InstallDir
@@ -1107,6 +1386,7 @@ function Restore-Originals {
     if ($Mode -eq 'own' -or -not (Test-SystemWideInstall $dir)) { $dir = Get-InstallDir }
     $target = Get-IconTarget $dir
     $restored = Test-Path -LiteralPath $target
+    $handMade = @()
     if ($restored) {
         $stamp = Read-IconStamp $target
         foreach ($name in $IconFiles) {
@@ -1117,12 +1397,17 @@ function Restore-Originals {
             $hash = Get-Hash $dst
             $ours = ($hash -and $hash -eq (Get-Hash (Join-Path $CurrentDir $name))) -or
                     ($hash -and $stamp.ContainsKey($name) -and $hash -eq $stamp[$name])
-            if (Test-Path -LiteralPath $backup) { Copy-Item -LiteralPath $backup $dst -Force }
+            if ($hash -and -not $ours) {
+                # Not ours: the original (nothing to do), or changed by hand since - leave that.
+                if ((Test-Path -LiteralPath $backup) -and $hash -ne (Get-Hash $backup)) { $handMade += $name }
+                continue
+            }
+            if (Test-Path -LiteralPath $backup) { Copy-IconFile $backup $dst }
             elseif ($ours) { Remove-Item -LiteralPath $dst }
         }
         Remove-IconStamp $target
     }
-    Restore-ShortcutIcons $state
+    $failed = Restore-ShortcutIcons $state (Get-BetterbirdExes $dir)
     Update-IconCache
     if (-not $restored -and (Test-HasBackup)) {
         # Install folder is gone: keep the backup, it's the only copy.
@@ -1130,8 +1415,147 @@ function Restore-Originals {
         Write-Warn "$target is not there any more, so your earlier icons were kept in $BackupDir."
         return
     }
+    if ($handMade.Count -gt 0 -or $failed -gt 0) {
+        Remove-DataDir -KeepBackup
+        if ($handMade.Count -gt 0) {
+            Write-Warn "$($handMade -join ' and ') in $target was changed after this tool backed it up, so it was left as it is. The earlier one is kept in $BackupDir. Revert to Betterbird defaults removes both."
+        }
+        if ($failed -gt 0) {
+            Write-Warn "$failed shortcut(s) could not be put back, so the icon they use was kept in $CurrentDir. Run Restore again once they can be changed."
+        }
+        return
+    }
     Remove-DataDir
     Write-Done 'Original icons and shortcuts restored.'
+}
+
+# ---------------------------------------------------------------- factory reset
+
+function Get-InstalledIcon([string]$Dir, [string]$File = 'messengerWindow.ico') {
+    # The icon actually installed (the window icon, or newmail.ico for the tray): Kind builtin
+    # (no file), ours (matches our stamp) or other; Set is the bundled set it equals, if any.
+    $target = Join-Path $Dir 'chrome\icons\default'
+    $hash = Get-Hash (Join-Path $target $File)
+    if (-not $hash) { return @{ Kind = 'builtin'; Set = $null } }
+    $stamp = Read-IconStamp $target
+    $set = $null
+    foreach ($name in $SetNotes.Keys) {
+        if ((Get-Hash (Join-Path $PSScriptRoot "icons\$name\$File")) -eq $hash) { $set = $name; break }
+    }
+    $kind = if ($stamp.ContainsKey($File) -and $stamp[$File] -eq $hash) { 'ours' } else { 'other' }
+    @{ Kind = $kind; Set = $set }
+}
+
+function Reset-Factory {
+    # Everything back to Betterbird's own, whatever put it there: icon files, shortcut icons,
+    # mail popup, this tool's data. Icons this tool didn't make are saved first. The start page
+    # needs the user's rights: Reset-StartPageToPrevious.
+    $dir = Get-InstallDir
+    $target = Get-IconTarget $dir
+    Close-Betterbird 'for a factory reset'
+    # A folder this tool didn't make is never read; Initialize-DataDir moves it aside if needed.
+    $trusted = (Test-Path -LiteralPath $DataDir) -and (Test-DataDirTrusted)
+    $state = if ($trusted) { Read-State } else { $null }
+    if ($state -and (Test-OtherOwnBetterbird $state.InstallDir $dir) -and (Test-HasBackup)) {
+        throw "The backup in $DataDir belongs to the Betterbird in $($state.InstallDir). Restore that one first."
+    }
+
+    # Icon files: keep a copy of anything that isn't ours, including the backups of what was
+    # there before this tool.
+    $stamp = Read-IconStamp $target
+    $toSave = @()
+    foreach ($name in $IconFiles) {
+        $dst = Join-Path $target $name
+        if (-not (Test-Path -LiteralPath $dst)) { continue }
+        if (Test-ReparsePoint $dst) { throw "$dst is a link; not changing it." }
+        $hash = Get-Hash $dst
+        $ours = ($trusted -and $hash -eq (Get-Hash (Join-Path $CurrentDir $name))) -or
+                ($stamp.ContainsKey($name) -and $hash -eq $stamp[$name])
+        if (-not $ours) { $toSave += @{ From = $dst; Name = $name; Hash = $hash } }
+    }
+    if ($trusted) {
+        foreach ($name in $IconFiles) {
+            $backup = Join-Path $BackupDir $name
+            $hash = Get-Hash $backup
+            if ($hash -and -not ($toSave | Where-Object { $_.Hash -eq $hash })) {
+                $toSave += @{ From = $backup; Name = $name -replace '\.ico$', ' (before this tool).ico'; Hash = $hash }
+            }
+        }
+    }
+    $saved = $null
+    if ($toSave.Count -gt 0) {
+        Initialize-DataDir
+        $saved = Join-Path $DataDir ('saved-{0:yyyyMMdd-HHmmss}' -f (Get-Date))
+        # Inherits the data folder's admin-only permissions; never read back by this tool.
+        New-Item -ItemType Directory -Path $saved | Out-Null
+        foreach ($s in $toSave) { Copy-Item -LiteralPath $s.From (Join-Path $saved $s.Name) }
+        foreach ($s in $toSave) {
+            if ((Get-Hash (Join-Path $saved $s.Name)) -ne $s.Hash) { throw "Couldn't save a copy of $($s.From), so nothing was removed." }
+        }
+        $state = Read-State   # Initialize-DataDir may have moved an untrusted folder aside
+        $trusted = $true
+    }
+    foreach ($name in $IconFiles) {
+        $dst = Join-Path $target $name
+        if (-not (Test-Path -LiteralPath $dst)) { continue }
+        (Get-Item -LiteralPath $dst).IsReadOnly = $false
+        Remove-Item -LiteralPath $dst -Force
+    }
+    Remove-IconStamp $target
+
+    # Shortcuts: every Betterbird shortcut found, plus any this tool recorded.
+    $exes = Get-BetterbirdExes $dir
+    $shell = New-Object -ComObject WScript.Shell
+    $paths = @(@(if ($state) { $state.Shortcuts }) + @(Find-Shortcuts $exes) | Where-Object { $_ } | Select-Object -Unique)
+    $failed = 0
+    foreach ($p in $paths) {
+        if (-not (Test-Path -LiteralPath $p)) { continue }
+        try { $lnk = $shell.CreateShortcut($p) } catch { continue }
+        if ($exes -notcontains [Environment]::ExpandEnvironmentVariables($lnk.TargetPath)) { continue }
+        if ($lnk.IconLocation -in ',0', '') { continue }
+        if (-not (Save-ShortcutIcon $shell $p ',0')) { $failed++ }
+    }
+    Update-IconCache
+
+    # Mail popup: only if omni.ja is there; a failure here doesn't undo the rest.
+    $popupOk = $true
+    if (Test-Path -LiteralPath (Join-Path $dir 'omni.ja')) {
+        try { Set-MailPopup -Name 'factory' }
+        catch { $popupOk = $false; Write-Warn "Mail popup not changed: $($_.Exception.Message)" }
+    }
+
+    if ($trusted) {
+        if ($failed -gt 0) {
+            # Keep current\: a shortcut that couldn't be changed may still use it. The backups
+            # are in the saved copy.
+            if (-not (Test-ReparsePoint $BackupDir)) {
+                foreach ($name in $IconFiles) { Remove-Item -LiteralPath (Join-Path $BackupDir $name) -Force -ErrorAction SilentlyContinue }
+            }
+            Remove-Item -LiteralPath $StateFile -Force -ErrorAction SilentlyContinue
+        }
+        else { Remove-DataDir }
+    }
+    if ($saved) { Write-Warn "Icons this tool did not make were removed; a copy is in $saved." }
+    if ($failed -gt 0) {
+        Write-Warn "$failed shortcut(s) could not be changed. Change their icon by hand (see -Manual)."
+    }
+    if ($failed -eq 0 -and $popupOk) { Write-Done "Betterbird is back to its own icons and mail popup. Start it again to see them." }
+}
+
+function Reset-StartPageToPrevious {
+    # The start page part of a factory reset: put back what was there before this tool, in
+    # profiles it changed. A start page you set yourself stays.
+    if (Test-Admin) {
+        Write-Warn 'The start page was left as it is: it is only changed with your normal rights. Use Start page, then Put the previous page back, from a normal window.'
+        return
+    }
+    $profiles = @()
+    try { $profiles = @(Get-Profiles (Get-InstallDir)) } catch { $null = $_ }
+    if (@($profiles | Where-Object { Test-Path -LiteralPath (Join-Path $_ $SideFile) }).Count -eq 0) {
+        Write-Step 'Start page: not changed by this tool, so left as it is.'
+        return
+    }
+    Set-StartPage 'Off'
 }
 
 # ---------------------------------------------------------------- start page
@@ -1372,19 +1796,111 @@ function Get-BytesHash([byte[]]$Bytes) {
     finally { $sha.Dispose() }
 }
 
+function Resolve-PopupName([string]$Name) {
+    # A window set, 'factory', or the full path of an .ico. 'yours' is the old name for blue.
+    if ($Name -eq 'yours') { return 'blue' }
+    if ($Name -eq 'factory') { return 'factory' }
+    $set = @(Get-MenuIconSets 'window') | Where-Object { $_ -eq $Name } | Select-Object -First 1
+    if ($set) { return $set }
+    $isFile = $false
+    try { $isFile = [bool]$Name -and (Test-Path -LiteralPath $Name -PathType Leaf) } catch { $isFile = $false }
+    if ($isFile) {
+        $full = (Resolve-Path -LiteralPath $Name).Path
+        if ([IO.Path]::GetExtension($full) -ne '.ico' -or -not (Test-IcoFile $full)) { throw "$Name is not an .ico icon file." }
+        return $full
+    }
+    throw "There is no mail popup called '$Name'."
+}
+
+function Get-PopupSetName([string]$Key) {
+    # What the marker and the messages call it: a set name, factory, or custom (your own .ico).
+    if ($Key -match '^[A-Za-z0-9-]+$') { $Key } else { 'custom' }
+}
+
+function Get-PopupLabel([string]$SetName) {
+    switch ($SetName) {
+        'factory' { "Betterbird's own" }
+        'custom'  { 'your own picture' }
+        default   { $SetName }
+    }
+}
+
+function New-PopupBytes([string]$Ico) {
+    # Draw the popup pictures from the largest picture in an .ico, at the sizes the popup uses.
+    $frames = @(Get-IcoFrames $Ico)
+    try {
+        $big = $frames | Sort-Object Width -Descending | Select-Object -First 1
+        $map = @{}
+        foreach ($jarName in $PopupFiles.Keys) {
+            $size = $PopupFiles[$jarName].Size
+            $bitmap = New-Object System.Drawing.Bitmap $size, $size, ([System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
+            $draw = [System.Drawing.Graphics]::FromImage($bitmap)
+            $attributes = New-Object System.Drawing.Imaging.ImageAttributes
+            $memory = New-Object IO.MemoryStream
+            try {
+                $draw.Clear([System.Drawing.Color]::Transparent)
+                $draw.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+                $draw.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
+                $draw.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
+                $draw.CompositingQuality = [System.Drawing.Drawing2D.CompositingQuality]::HighQuality
+                # No faint edge around the picture.
+                $attributes.SetWrapMode([System.Drawing.Drawing2D.WrapMode]::TileFlipXY)
+                $draw.DrawImage($big, (New-Object System.Drawing.Rectangle 0, 0, $size, $size), 0, 0, $big.Width, $big.Height,
+                    [System.Drawing.GraphicsUnit]::Pixel, $attributes)
+                $bitmap.Save($memory, [System.Drawing.Imaging.ImageFormat]::Png)
+                $map[$jarName] = $memory.ToArray()
+            }
+            finally { $memory.Dispose(); $attributes.Dispose(); $draw.Dispose(); $bitmap.Dispose() }
+            if (-not (Test-PopupPng -Bytes $map[$jarName] -Size $size)) { throw "Couldn't make the mail popup picture from $Ico." }
+        }
+        $map
+    }
+    finally { foreach ($frame in $frames) { $frame.Dispose() } }
+}
+
 function Get-PopupBytes([string]$Name) {
-    if (-not $PopupChoices.Contains($Name)) { throw "There is no mail popup called '$Name'." }
-    $dir = Join-Path $PSScriptRoot "icons\popup\$Name"
+    # The two popup pictures by entry name: ready-made for blue and factory, else drawn.
+    $key = Resolve-PopupName $Name
+    $folder = switch ($key) { 'factory' { 'factory' } 'blue' { 'yours' } default { $null } }
+    if (-not $folder) {
+        $ico = if ($key -match '^[A-Za-z0-9-]+$') { Join-Path $PSScriptRoot "icons\$key\messengerWindow.ico" } else { $key }
+        return (New-PopupBytes $ico)
+    }
+    $dir = Join-Path $PSScriptRoot "icons\popup\$folder"
     $map = @{}
     foreach ($jarName in $PopupFiles.Keys) {
         $info = $PopupFiles[$jarName]
         $path = Join-Path $dir $info.File
-        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "The mail popup '$Name' is missing $($info.File)." }
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "The mail popup '$key' is missing $($info.File)." }
         $bytes = [IO.File]::ReadAllBytes($path)
-        if (-not (Test-PopupPng -Bytes $bytes -Size $info.Size)) { throw "The mail popup '$Name' has a damaged $($info.File)." }
+        if (-not (Test-PopupPng -Bytes $bytes -Size $info.Size)) { throw "The mail popup '$key' has a damaged $($info.File)." }
         $map[$jarName] = $bytes
     }
     $map
+}
+
+function New-PopupMarker([string]$Key, $Bytes) {
+    # Which set the popup shows, with the hashes of the pictures that were put there.
+    $lines = @('set=' + (Get-PopupSetName $Key))
+    foreach ($jarName in $PopupFiles.Keys) {
+        $lines += '{0}={1}' -f ($PopupFiles[$jarName].File -replace '\.png$', ''), (Get-BytesHash -Bytes $Bytes[$jarName])
+    }
+    , [Text.Encoding]::UTF8.GetBytes((($lines -join "`r`n") + "`r`n"))   # the comma keeps it one byte array
+}
+
+function Get-PopupMarkerSet($Found) {
+    # The set the marker names, if the pictures in omni.ja still are the ones it recorded.
+    if (-not $Found.ContainsKey($PopupMarker)) { return $null }
+    $text = [Text.Encoding]::UTF8.GetString($Found[$PopupMarker])
+    $set = [regex]::Match($text, '(?m)^set=([A-Za-z0-9-]+)\s*$')
+    if (-not $set.Success) { return $null }
+    if ($set.Groups[1].Value -notin @(Get-MenuIconSets 'window') + 'custom') { return $null }
+    foreach ($jarName in $PopupFiles.Keys) {
+        $line = [regex]::Match($text, '(?m)^' + ($PopupFiles[$jarName].File -replace '\.png$', '') + '=([0-9A-F]{64})\s*$')
+        if (-not $line.Success -or -not $Found.ContainsKey($jarName)) { return $null }
+        if ((Get-BytesHash -Bytes $Found[$jarName]) -ne $line.Groups[1].Value) { return $null }
+    }
+    $set.Groups[1].Value
 }
 
 function Initialize-StoredJar {
@@ -1421,40 +1937,36 @@ namespace BetterbirdIcons {
     public static class StoredJar {
         static readonly uint[] Table = BuildTable();
 
+        // replacements: entry name -> new bytes. A null value drops the entry; a name not in
+        // the archive is added at the end.
         public static void Write(string sourcePath, string destPath, IDictionary replacements) {
             var items = new List<Item>();
+            var seen = new Dictionary<string, bool>(StringComparer.Ordinal);
             using (var source = ZipFile.OpenRead(sourcePath))
             using (var stream = new FileStream(destPath, FileMode.CreateNew, FileAccess.Write, FileShare.None))
             using (var writer = new BinaryWriter(stream)) {
                 foreach (ZipArchiveEntry entry in source.Entries) {
+                    seen[entry.FullName] = true;
                     bool replaced = replacements != null && replacements.Contains(entry.FullName);
+                    if (replaced && replacements[entry.FullName] == null) continue;
                     byte[] data = replaced ? Bytes(replacements[entry.FullName]) : ReadAll(entry);
-                    if (data.LongLength > uint.MaxValue)
-                        throw new InvalidDataException("A file in the picture archive is too large.");
                     uint crc = Crc32(data);
                     if (!replaced && ReadCrc(entry) != crc)
                         throw new InvalidDataException("The picture archive could not be read whole.");
-                    if (stream.Position > uint.MaxValue)
-                        throw new InvalidDataException("The picture archive is too large.");
-                    var item = new Item();
-                    item.Name = entry.FullName;
-                    item.NameBytes = Encoding.UTF8.GetBytes(entry.FullName);
-                    if (item.NameBytes.Length > ushort.MaxValue)
-                        throw new InvalidDataException("A file name in the picture archive is too long.");
-                    item.Flags = 0;
-                    for (int i = 0; i < item.NameBytes.Length; i++) {
-                        if (item.NameBytes[i] >= 128) { item.Flags = 0x800; break; }
+                    Add(writer, stream, items, entry.FullName, data, crc, entry.LastWriteTime.LocalDateTime,
+                        unchecked((uint)entry.ExternalAttributes));
+                }
+                if (replacements != null) {
+                    var added = new List<string>();
+                    foreach (DictionaryEntry pair in replacements) {
+                        string name = (string)pair.Key;
+                        if (pair.Value != null && !seen.ContainsKey(name)) added.Add(name);
                     }
-                    item.Crc = crc;
-                    item.Size = (uint)data.LongLength;
-                    DateTime local = entry.LastWriteTime.LocalDateTime;
-                    if (local.Year < 1980) local = new DateTime(1980, 1, 1);
-                    item.DosTime = (ushort)((local.Hour << 11) | (local.Minute << 5) | (local.Second / 2));
-                    item.DosDate = (ushort)(((local.Year - 1980) << 9) | (local.Month << 5) | local.Day);
-                    item.Attr = unchecked((uint)entry.ExternalAttributes);
-                    item.LocalOffset = (uint)stream.Position;
-                    WriteLocal(writer, item, data);
-                    items.Add(item);
+                    added.Sort(StringComparer.Ordinal);
+                    foreach (string name in added) {
+                        byte[] data = Bytes(replacements[name]);
+                        Add(writer, stream, items, name, data, Crc32(data), DateTime.Now, 0);
+                    }
                 }
                 if (items.Count > ushort.MaxValue)
                     throw new InvalidDataException("The picture archive has too many files.");
@@ -1467,6 +1979,32 @@ namespace BetterbirdIcons {
                 writer.Flush();
             }
             Verify(destPath, items);
+        }
+
+        static void Add(BinaryWriter writer, Stream stream, List<Item> items, string name, byte[] data,
+                        uint crc, DateTime local, uint attr) {
+            if (data.LongLength > uint.MaxValue)
+                throw new InvalidDataException("A file in the picture archive is too large.");
+            if (stream.Position > uint.MaxValue)
+                throw new InvalidDataException("The picture archive is too large.");
+            var item = new Item();
+            item.Name = name;
+            item.NameBytes = Encoding.UTF8.GetBytes(name);
+            if (item.NameBytes.Length > ushort.MaxValue)
+                throw new InvalidDataException("A file name in the picture archive is too long.");
+            item.Flags = 0;
+            for (int i = 0; i < item.NameBytes.Length; i++) {
+                if (item.NameBytes[i] >= 128) { item.Flags = 0x800; break; }
+            }
+            item.Crc = crc;
+            item.Size = (uint)data.LongLength;
+            if (local.Year < 1980) local = new DateTime(1980, 1, 1);
+            item.DosTime = (ushort)((local.Hour << 11) | (local.Minute << 5) | (local.Second / 2));
+            item.DosDate = (ushort)(((local.Year - 1980) << 9) | (local.Month << 5) | local.Day);
+            item.Attr = attr;
+            item.LocalOffset = (uint)stream.Position;
+            WriteLocal(writer, item, data);
+            items.Add(item);
         }
 
         static byte[] Bytes(object value) {
@@ -1591,34 +2129,48 @@ namespace BetterbirdIcons {
     Add-Type -TypeDefinition $code -ReferencedAssemblies $refs
 }
 
-function Get-MailPopupName {
-    # Which known popup image omni.ja has, or nothing.
-    $omni = Join-Path (Get-InstallDir) 'omni.ja'
-    if (-not (Test-Path -LiteralPath $omni -PathType Leaf) -or (Test-ReparsePoint $omni)) { return $null }
+function Read-PopupEntries([string]$Omni) {
+    # The popup pictures in omni.ja and any saved originals, by entry name (missing ones left out).
     Add-Type -AssemblyName System.IO.Compression.FileSystem
-    $zip = [IO.Compression.ZipFile]::OpenRead($omni)
+    $zip = [IO.Compression.ZipFile]::OpenRead($Omni)
+    $found = @{}
     try {
-        $found = @{}
-        foreach ($jarName in $PopupFiles.Keys) {
+        foreach ($jarName in @($PopupFiles.Keys) + @($PopupFiles.Keys | ForEach-Object { $_ + $PopupSaved }) + $PopupMarker) {
             $entry = $zip.GetEntry($jarName)
-            if (-not $entry) { return $null }
+            if (-not $entry) { continue }
             $stream = $entry.Open()
             try {
                 $memory = New-Object IO.MemoryStream
                 $stream.CopyTo($memory)
-                $found[$jarName] = Get-BytesHash -Bytes $memory.ToArray()
+                $found[$jarName] = $memory.ToArray()
             }
             finally { $stream.Dispose() }
         }
     }
     finally { $zip.Dispose() }
-    foreach ($name in $PopupChoices.Keys) {
-        $bytes = Get-PopupBytes -Name $name
-        $match = $true
-        foreach ($jarName in $PopupFiles.Keys) {
-            if ($found[$jarName] -ne (Get-BytesHash -Bytes $bytes[$jarName])) { $match = $false; break }
-        }
-        if ($match) { return $name }
+    $found
+}
+
+function Test-PopupMatch($Found, $Bytes) {
+    foreach ($jarName in $PopupFiles.Keys) {
+        if (-not $Found.ContainsKey($jarName)) { return $false }
+        if ((Get-BytesHash -Bytes $Found[$jarName]) -ne (Get-BytesHash -Bytes $Bytes[$jarName])) { return $false }
+    }
+    $true
+}
+
+function Get-MailPopupName {
+    # The set the popup shows (from the marker), 'custom' for your own .ico, 'factory' (the copy
+    # that comes with this tool), or nothing: not changed by this tool, possibly another build's
+    # own picture.
+    $omni = Join-Path (Get-InstallDir) 'omni.ja'
+    if (-not (Test-Path -LiteralPath $omni -PathType Leaf) -or (Test-ReparsePoint $omni)) { return $null }
+    $found = Read-PopupEntries $omni
+    $set = Get-PopupMarkerSet $found
+    if ($set) { return $set }
+    # Changed before the marker existed.
+    foreach ($name in 'blue', 'factory') {
+        if (Test-PopupMatch $found (Get-PopupBytes -Name $name)) { return $name }
     }
     $null
 }
@@ -1634,8 +2186,12 @@ function Test-FileInUse($ErrorRecord) {
 }
 
 function Set-MailPopup([string]$Name) {
-    # Replace the two popup images in omni.ja; copy everything else as is.
-    $replacements = Get-PopupBytes -Name $Name
+    # Replace the two popup images in omni.ja; copy everything else as is. The first change keeps
+    # Betterbird's own pictures inside omni.ja; 'factory' puts those back.
+    $key = Resolve-PopupName $Name   # also checks the name
+    $wanted = Get-PopupBytes -Name $key
+    $label = Get-PopupLabel (Get-PopupSetName $key)
+    $blue = Get-PopupBytes -Name 'blue'
     $dir = Get-InstallDir
     if (Test-ReparsePoint $dir) { throw "$dir is a link to another folder; not changing it." }
     $omni = Join-Path $dir 'omni.ja'
@@ -1646,11 +2202,43 @@ function Set-MailPopup([string]$Name) {
     $sddl = $null
     $wasReadOnly = $false
     try {
-        if ((Get-MailPopupName) -eq $Name) {
-            Write-Done "Mail popup is already $($PopupLabels[$Name])."
-            return
-        }
         Assert-MailPopupEntries -Omni $omni
+        $found = Read-PopupEntries $omni
+        $saved = @{}
+        foreach ($jarName in $PopupFiles.Keys) {
+            if ($found.ContainsKey($jarName + $PopupSaved)) { $saved[$jarName] = $found[$jarName + $PopupSaved] }
+        }
+        $hasSaved = $saved.Count -eq $PopupFiles.Count
+        $shown = Get-PopupMarkerSet $found
+        # Blue from an older version, which kept no copy of the original and left no marker.
+        $isOldBlue = -not $shown -and (Test-PopupMatch $found $blue)
+        $replacements = @{}
+        if ($key -eq 'factory') {
+            if ($hasSaved) {
+                foreach ($jarName in $PopupFiles.Keys) {
+                    $replacements[$jarName] = $saved[$jarName]
+                    $replacements[$jarName + $PopupSaved] = $null
+                }
+                $replacements[$PopupMarker] = $null
+            }
+            elseif ($shown -or $isOldBlue) {
+                foreach ($jarName in $PopupFiles.Keys) { $replacements[$jarName] = $wanted[$jarName] }
+                $replacements[$PopupMarker] = $null
+                Write-Warn "Betterbird's own popup picture was not kept when it was changed, so the copy that comes with this tool was used. If it doesn't look right, reinstall Betterbird."
+            }
+            else {
+                Write-Done "Mail popup already has Betterbird's own picture."
+                return
+            }
+        }
+        else {
+            if (Test-PopupMatch $found $wanted) { Write-Done "Mail popup is already $label."; return }
+            foreach ($jarName in $PopupFiles.Keys) {
+                $replacements[$jarName] = $wanted[$jarName]
+                if (-not $hasSaved -and -not $shown -and -not $isOldBlue) { $replacements[$jarName + $PopupSaved] = $found[$jarName] }
+            }
+            $replacements[$PopupMarker] = New-PopupMarker $key $wanted
+        }
         if (Test-Path -LiteralPath $tmp) { Remove-Item -LiteralPath $tmp -Force }
         $sddl = (Get-Acl -LiteralPath $omni).Sddl
         Initialize-StoredJar
@@ -1659,11 +2247,11 @@ function Set-MailPopup([string]$Name) {
         $wasReadOnly = $file.IsReadOnly
         if ($wasReadOnly) { $file.IsReadOnly = $false }
         [IO.File]::Replace($tmp, $omni, [NullString]::Value)
-        Write-Done "Mail popup set to $($PopupLabels[$Name])."
+        Write-Done "Mail popup set to $label."
         Write-Warn 'Quit Betterbird and open it again to see it. A Betterbird update puts the original bird back.'
     }
     catch {
-        if (Test-FileInUse -ErrorRecord $_) { throw 'Betterbird is using that picture. Quit it completely, including the tray icon, then try again.' }
+        if (Test-FileInUse -ErrorRecord $_) { throw $PopupInUse }
         throw
     }
     finally {
@@ -1724,22 +2312,152 @@ function Resolve-MenuIcon([string]$Answer, [string]$Kind = 'all') {
     $Answer
 }
 
+function Get-PopupMenuChoices {
+    # Every window set, then Betterbird's own.
+    @(Get-MenuIconSets 'window') + 'factory'
+}
+
+function Resolve-MenuPopup([string]$Answer) {
+    # List number or set name.
+    $names = @(Get-PopupMenuChoices)
+    if ($Answer -match '^\d+$') {
+        $n = [int]$Answer
+        if ($n -ge 1 -and $n -le $names.Count) { return $names[$n - 1] }
+        throw "There is no mail popup number $Answer."
+    }
+    $Answer
+}
+
+function Get-IconPageHtml([switch]$Absolute) {
+    # The preview page, built from the same lists as the menu so the numbers match. Popup pictures
+    # are drawn here and embedded; -Absolute points the other pictures at this download folder.
+    $base = if ($Absolute) { ([Uri]$PSScriptRoot).AbsoluteUri.TrimEnd('/') + '/icons' } else { '../icons' }
+    $window = @(Get-MenuIconSets 'window')
+    $tray = @(Get-MenuIconSets 'newmail')
+    $rows = New-Object System.Collections.Generic.List[string]
+    foreach ($name in (Get-MenuIconSets 'all')) {
+        $w = [array]::IndexOf($window, $name) + 1
+        $t = [array]::IndexOf($tray, $name) + 1
+        $cells = @()
+        $cells += if ($w) { "<td class=`"num`">$w</td><td><img src=`"$base/$name/messengerWindow.ico`" alt=`"`"></td>" } else { '<td></td><td></td>' }
+        $cells += if ($t) { "<td class=`"num`">$t</td><td><img src=`"$base/$name/newmail.ico`" alt=`"`"></td>" } else { '<td></td><td></td>' }
+        $cells += if ($w) { "<td class=`"num`">$w</td><td><img src=`"$(Get-PopupDataUri $name)`" alt=`"`"></td>" } else { '<td></td><td></td>' }
+        $class = if ($name -eq 'blue') { ' class="yours"' } else { '' }
+        $rows.Add("  <tr><td$class>$name</td>$($cells -join '')</tr>")
+    }
+    $own = $window.Count + 1
+    $rows.Add("  <tr><td>Betterbird's own</td><td></td><td></td><td class=`"num`">none</td><td>Betterbird's built-in icon</td><td class=`"num`">$own</td><td><img src=`"$(Get-PopupDataUri 'factory')`" alt=`"`"></td></tr>")
+    @"
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Betterbird icons</title>
+<style>
+  body { font-family: Segoe UI, sans-serif; background: #161616; color: #f2f2f2; margin: 32px; }
+  h1 { font-size: 22px; font-weight: 600; }
+  p { color: #c8c8c8; }
+  table { border-collapse: collapse; }
+  th, td { text-align: left; padding: 12px 18px; border-bottom: 1px solid #333; vertical-align: middle; }
+  th { color: #aaa; font-weight: 600; }
+  img { width: 64px; height: 64px; background: #000; }
+  .num { font-size: 24px; }
+  .yours { color: #9ee7c4; }
+</style>
+</head>
+<body>
+<h1>Betterbird icons</h1>
+<p>Type the number in the menu: <b>Window</b> for options 1 and 2, <b>Tray</b> for option 3, <b>Popup</b> for option 5. The tray picture is the same bird with a dot.</p>
+<table>
+  <tr><th>Name</th><th>Window</th><th></th><th>Tray</th><th></th><th>Popup</th><th></th></tr>
+$($rows -join "`r`n")
+</table>
+</body>
+</html>
+"@
+}
+
+function Get-PopupDataUri([string]$Name) {
+    # A 64 px popup picture as a data address, for the preview page.
+    $bytes = (Get-PopupBytes -Name $Name)['chrome/messenger/content/branding/icon64.png']
+    'data:image/png;base64,' + [Convert]::ToBase64String($bytes)
+}
+
 function Open-IconPage {
-    # Open the icon preview page.
+    # Open the icon preview page. It is made fresh in the temp folder, so its numbers always
+    # match the menu; the printed page in images\ is the fallback.
     $page = Join-Path $PSScriptRoot 'images\choose.html'
+    try {
+        $made = Join-Path ([IO.Path]::GetTempPath()) 'betterbird-icons-choose.html'
+        if (Test-ReparsePoint $made) { throw "$made is a link." }
+        [IO.File]::WriteAllText($made, (Get-IconPageHtml -Absolute), (New-Object Text.UTF8Encoding $false))
+        $page = $made
+    }
+    catch { $null = $_ }
     if (-not (Test-Path -LiteralPath $page)) { return }
     Start-Process ([Uri](Resolve-Path -LiteralPath $page).Path).AbsoluteUri
 }
 
-function Show-List([string]$Kind = 'all') {
+function Show-List([string]$Kind = 'all', [string]$Current) {
     Write-Host ''
-    Write-Host $(if ($Kind -eq 'newmail') { '  New-mail icons:' } else { '  Icon sets:' })
+    Write-Host $(switch ($Kind) { 'newmail' { '  New-mail icons:' } 'popup' { '  New-mail popup pictures:' } default { '  Icon sets:' } })
     $i = 1
-    foreach ($name in (Get-MenuIconSets $Kind)) {
-        $note = $SetNotes[$name]
-        Write-Host ('    {0}) {1,-11} {2}' -f $i, $name, $note)
+    foreach ($name in $(if ($Kind -eq 'popup') { Get-PopupMenuChoices } else { Get-MenuIconSets $Kind })) {
+        $note = if ($name -eq 'factory') { "Betterbird's own" } else { $SetNotes[$name] }
+        $mark = if ($Current -and $name -eq $Current) { '    current' } else { '' }
+        Write-Host ('    {0}) {1,-11} {2}{3}' -f $i, $(if ($name -eq 'factory') { 'Betterbird' } else { $name }), $note, $mark)
         $i++
     }
+}
+
+# ---------------------------------------------------------------- explorer
+
+function Restart-Explorer {
+    # Only with the user's own rights: an Explorer started from an administrator window would run
+    # as administrator. This user's Explorer = the ones in this Windows session.
+    if (Test-Admin) {
+        Write-Warn $NoAdminExplorer
+        return $false
+    }
+    $session = [Diagnostics.Process]::GetCurrentProcess().SessionId
+    $oldIds = @(Get-Process -Name explorer -ErrorAction SilentlyContinue | Where-Object { $_.SessionId -eq $session } | ForEach-Object { $_.Id })
+    if ($oldIds.Count -gt 0) { Stop-Process -Id $oldIds -Force }
+    # Windows starts the shell again by itself; start it only if that hasn't happened.
+    $back = $false
+    for ($i = 0; $i -lt 10 -and -not $back; $i++) {
+        Start-Sleep -Milliseconds 500
+        $back = @(Get-Process -Name explorer -ErrorAction SilentlyContinue |
+                Where-Object { $_.SessionId -eq $session -and $oldIds -notcontains $_.Id }).Count -gt 0
+    }
+    if (-not $back) { Start-Process -FilePath (Join-Path $WindowsDir 'explorer.exe') }
+    Write-Done 'Explorer restarted.'
+    return $true
+}
+
+function Complete-Restarts([bool]$Explorer, [bool]$Betterbird) {
+    # Command line, in the user's own window once the change is done: Explorer, then Betterbird.
+    if ($Explorer) { [void](Restart-Explorer) }
+    if ($Betterbird -and $script:BetterbirdClosed) {
+        $script:BetterbirdClosed = $false
+        [void](Start-Betterbird)
+    }
+    Show-CollectedNotes
+}
+
+function Invoke-DebugRestart {
+    # Menu D, for debugging: close Betterbird and restart Windows Explorer. Own window only, never
+    # elevated (Explorer would then run as administrator).
+    Write-Host ''
+    Write-Host '  Closes Betterbird if it is open, and restarts Windows Explorer (File Explorer windows close).'
+    if (Test-Admin) { Write-Warn $NoAdminDebug; return }
+    $answer = "$(Read-Host '  Go ahead? (Y/N)')".Trim()
+    if ($answer -notmatch '^[Yy]') { return }
+    if (@(Get-Betterbird).Count -gt 0) {
+        if (Stop-Betterbird) { Write-Step 'Closed Betterbird.' }
+        else { Write-Warn 'Betterbird is still open, so it was left as it is.' }
+    }
+    else { Write-Step 'Betterbird was not open.' }
+    [void](Restart-Explorer)
 }
 
 function Show-Status {
@@ -1747,21 +2465,43 @@ function Show-Status {
     $dir = $null
     $kind = if ($Mode -eq 'system') { 'installed for all users' } elseif ($Launcher) { 'portable' } else { 'in your own folder' }
     try { $dir = Get-InstallDir; Write-Host "  Betterbird:     $dir   ($kind)" } catch { Write-Warn $_.Exception.Message }
-    if (-not (Test-Path -LiteralPath $DataDir)) { Write-Host '  Icon:           original (not changed by this script)' }
-    elseif (-not (Test-DataDirTrusted)) { Write-Warn "Icon:           unknown - $DataDir was not made by this tool" }
-    else {
-        $state = Read-State
-        if ($state -and $state.Icon) {
-            Write-Host "  Icon:           $($state.Icon)   (new-mail icon: $($state.NewMail))"
-            Write-Host "  Shortcuts:      $(@($state.Shortcuts).Count) using the icon"
+    # What is installed, checked against the stamp, not just what the record says.
+    $state = $null
+    $trusted = (Test-Path -LiteralPath $DataDir) -and (Test-DataDirTrusted)
+    if ($trusted) { $state = Read-State }
+    elseif (Test-Path -LiteralPath $DataDir) { Write-Warn "This tool's data folder $DataDir was not made by this tool, so it is ignored." }
+    if ($dir) {
+        $installed = Get-InstalledIcon $dir
+        $like = if ($installed.Set) { ", the same as the '$($installed.Set)' set" } else { '' }
+        switch ($installed.Kind) {
+            'builtin' { Write-Host "  Icon:           Betterbird's own" }
+            'ours' {
+                $name = if ($state -and $state.Icon) { $state.Icon } elseif ($installed.Set) { $installed.Set } else { 'set by this tool' }
+                $mail = if ($state -and $state.NewMail) { "   (new-mail icon: $($state.NewMail))" } else { '' }
+                Write-Host "  Icon:           $name$mail"
+            }
+            default { Write-Host "  Icon:           a custom icon not put there by this tool$like. Revert to Betterbird defaults removes it." }
         }
-        else { Write-Host '  Icon:           original (not changed by this script)' }
+        if ($installed.Kind -ne 'ours' -and $state -and $state.Icon) {
+            Write-Warn "This tool's record says '$($state.Icon)', but that is not what is installed. Revert to Betterbird defaults tidies this up."
+        }
+        $tray = Get-InstalledIcon $dir 'newmail.ico'
+        $trayLike = if ($tray.Set) { ", the same as the '$($tray.Set)' set" } else { '' }
+        switch ($tray.Kind) {
+            'builtin' { Write-Host "  Tray icon:      Betterbird's own" }
+            'ours' {
+                $text = if ($state -and $state.NewMail -and $state.NewMail -notin 'none', 'original') { $state.NewMail } elseif ($tray.Set) { $tray.Set } else { 'set by this tool' }
+                Write-Host "  Tray icon:      $text"
+            }
+            default { Write-Host "  Tray icon:      a custom icon not put there by this tool$trayLike. Revert to Betterbird defaults removes it." }
+        }
     }
+    if ($state -and @($state.Shortcuts).Count -gt 0) { Write-Host "  Shortcuts:      $(@($state.Shortcuts).Count) using this tool's icon" }
     if ($dir) {
         $popupText = 'not changed by this tool'
         try {
             $popup = Get-MailPopupName
-            if ($popup) { $popupText = $PopupLabels[$popup] }
+            if ($popup) { $popupText = Get-PopupLabel $popup }
         }
         catch { $popupText = 'not changed by this tool' }
         Write-Host "  Mail popup:     $popupText"
@@ -1808,6 +2548,16 @@ function Show-Manual {
         '    - Taskbar: right-click the Betterbird button, right-click "Betterbird" in the list that opens,'
         '      Properties, Change Icon. The new icon shows after you sign out and back in.'
         ''
+        '  If the old icon keeps showing'
+        '    Betterbird reads its window, taskbar button and system tray icon when it starts: quit it'
+        '    completely (including the tray icon) and open it again. In this tool, the menu offers to do that'
+        '    before a change; -RestartBetterbird does the same from the command line.'
+        '    If the desktop or taskbar shortcut still shows the old icon, Windows is keeping it in a cache until'
+        '    Explorer restarts. Sign out and back in, or restart Windows. To do it at once: Ctrl+Shift+Esc,'
+        '    right-click Windows Explorer in the list, Restart. Open File Explorer windows close.'
+        '    In this tool, D (Debug issues) closes Betterbird and restarts Explorer; -RestartExplorer restarts Explorer'
+        '    from the command line. They only ever use your normal rights, never administrator.'
+        ''
         '  Start page'
         '    1. In Betterbird, open the menu (three lines, top right), Settings, General.'
         '    2. In the Start Page section, tick the option to show the Start Page when Betterbird launches,'
@@ -1816,10 +2566,20 @@ function Show-Manual {
         ''
         '  Mail popup'
         '    The large popup for a new message uses a picture built into Betterbird.'
-        '    In this tool, choose Change the mail popup. 1 is the blue bird. 2 puts'
-        '    Betterbird''s own bird back. Quit Betterbird and open it again.'
+        '    In this tool, choose 5 (Change the "new mail" popup icon): any icon set, or Betterbird''s own'
+        '    to put the original bird back. Only blue has a ready-made picture; for the others the tool'
+        '    draws one from the set''s icon. Choosing 1 (all at once) changes the popup too.'
+        '    Quit Betterbird and open it again.'
         '    A Betterbird update puts the original bird back, so choose it again afterwards.'
-        '    Restoring the original icons does not change this popup.'
+        '    -Restore (put the earlier icons back) does not change this popup; R does.'
+        ''
+        '  Back to factory'
+        '    Revert to Betterbird defaults (menu R) removes every icon file from the folder above (a copy of any this'
+        '    tool did not make is kept), gives the shortcuts Betterbird''s own icon, puts Betterbird''s'
+        '    own popup back, and puts back the start page you had before this tool changed it.'
+        '    By hand: delete messengerWindow.ico and newmail.ico from the folder above, and for each'
+        '    shortcut use Properties, Change Icon and pick the icon in betterbird.exe. Reinstalling'
+        '    Betterbird puts its own popup back.'
         ''
         '  Put the original icon back'
         '    1. Close Betterbird.'
@@ -1830,12 +2590,16 @@ function Show-Manual {
     ) | ForEach-Object { Write-Host $_ }
 }
 
+function Write-MenuItem([string]$Text, [switch]$Admin) {
+    $ask = if ($Admin -and $Mode -eq 'system' -and -not (Test-Admin)) { '(asks for administrator permission)' } else { '' }
+    Write-Host ('  {0,-48}{1}' -f $Text, $ask).TrimEnd()
+}
+
 function Show-Menu {
     # Runs as the user; in system mode only the icon actions elevate.
     # Each screen clears the previous one.
     while ($true) {
         Clear-Host
-        $ask = if ($Mode -eq 'system' -and -not (Test-Admin)) { '(asks for administrator permission)' } else { '' }
         $where = if ($Mode -eq 'system') { 'installed for all users' } elseif ($Launcher) { "portable, $AppDir" } else { $AppDir }
         Write-Host ''
         Write-Host "  Betterbird Icons   - Betterbird $where" -ForegroundColor Cyan
@@ -1849,44 +2613,125 @@ function Show-Menu {
             }
             $script:MenuNotice = $null
         }
-        Write-Host "  1) Change icon                 $ask"
-        Write-Host '  2) Start page'
-        Write-Host "  3) Restore original icons      $ask"
-        Write-Host '  4) Status'
-        Write-Host '  5) Manual instructions (do it by hand)'
-        Write-Host "  6) Change the new-mail icon    $ask"
-        Write-Host '  7) See the icons'
-        Write-Host "  8) Change the dot colour       $ask"
-        Write-Host "  9) Change the mail popup       $ask"
-        Write-Host '  P) Use a portable Betterbird, or one in your own folder'
-        Write-Host '  Q) Quit'
+        Write-MenuItem '1) Change all at once (2, 3 and 5)' -Admin
+        Write-MenuItem '2) Change the standard icon (Windows app icon)' -Admin
+        Write-MenuItem '3) Change the system tray icon' -Admin
+        Write-MenuItem '4) Change the system tray dot colour' -Admin
+        Write-MenuItem '5) Change the "new mail" popup icon' -Admin
+        Write-MenuItem '6) Show the icons for selection'
+        Write-MenuItem '7) Show manual instructions'
+        Write-MenuItem '8) Change the start page'
+        Write-MenuItem '9) Show the current setup'
+        Write-MenuItem 'D) Debug issues: close Betterbird and restart Windows Explorer'
+        Write-MenuItem 'R) Revert to Betterbird defaults' -Admin
+        Write-MenuItem 'S) Select a different Betterbird folder (such as a portable one)'
+        Write-MenuItem 'Q) Quit'
         $choice = Read-Host '  Choose'
         $pause = $false
         try {
             switch ($choice) {
-                '1' {
+                { $_ -in '1', '2' } {
                     Clear-Host
                     Show-List 'window'
                     $answer = "$(Read-Host '  Number, or the path to your own .ico file')".Trim().Trim('"')
                     if (-not $answer) { continue }
                     $name = Resolve-MenuIcon $answer 'window'
-                    # Also switches to the set's new-mail icon.
                     $asks = $Mode -eq 'system' -and -not (Test-Admin)
-                    Show-Working "Changing the icon to $name." $asks
+                    $all = $choice -eq '1'
+                    # 1: its own tray icon and popup too. 2: the tray icon stays as it is.
+                    $mail = if ($all) { $null } else { 'keep' }
+                    $what = if ($all) { "the icon, the tray icon and the popup to $name" } else { "the standard icon to $name" }
+                    # 1 changes the popup, which can't be done while Betterbird holds omni.ja open.
+                    $closed = Request-BetterbirdClosed $(if ($all) { $PopupInUse })
+                    Show-Working "Changing $what." $asks
                     $script:Notes = @()
                     $changed = $false
-                    if (-not $asks) { Install-Icon $name $null; $changed = $true }
-                    else { $changed = Invoke-Elevated @{ Icon = $name } }
-                    Set-MenuResult $changed "Changed the icon to $name."
+                    try {
+                        if (-not $asks) {
+                            # Popup first: if Betterbird holds omni.ja open, nothing has changed yet.
+                            if ($all) { Set-MailPopup -Name $name }
+                            Install-Icon $name $mail
+                            $changed = $true
+                        }
+                        else {
+                            $options = @{ Icon = $name }
+                            if ($all) { $options.MailPopup = $name } else { $options.NewMail = 'keep' }
+                            $changed = Invoke-Elevated $options
+                        }
+                    }
+                    finally { if ($closed) { [void](Start-Betterbird) } }
+                    Set-MenuResult $changed "Changed $what."
                 }
-                { $_ -match '^[Pp]$' } {
+                '3' {
                     Clear-Host
-                    $folder = "$(Read-Host '  Betterbird folder (the one with BetterbirdLauncher.exe or betterbird.exe)')".Trim().Trim('"')
-                    if (-not $folder) { continue }
-                    Enter-OwnFolderMode $folder
-                    if (-not (Confirm-StandardUser @{ Portable = $folder })) { return }
+                    Show-List 'newmail'
+                    $answer = "$(Read-Host '  Number, or none for Betterbird''s own')".Trim().Trim('"')
+                    if (-not $answer) { continue }
+                    $mail = if ($answer -eq 'none') { 'none' } else { Resolve-MenuIcon $answer 'newmail' }
+                    $asks = $Mode -eq 'system' -and -not (Test-Admin)
+                    Show-Working 'Changing the system tray icon.' $asks
+                    $script:Notes = @()
+                    $changed = $false
+                    if (-not $asks) { Install-Icon '' $mail; $changed = $true }
+                    else { $changed = Invoke-Elevated @{ NewMail = $mail } }
+                    Set-MenuResult $changed 'Changed the system tray icon.'
                 }
-                '2' {
+                '4' {
+                    Clear-Host
+                    $base = Get-DotBasePath
+                    $installedMail = Get-CurrentNewMailPath
+                    $marked = Get-DotColourName $installedMail
+                    Write-Host ''
+                    Write-Host '  Dot colour of the system tray icon:'
+                    if (-not $installedMail) { Write-Host "  Current icon: Betterbird's own" }
+                    elseif (-not $marked) { Write-Host "  Current dot: the set's own colour" }
+                    $n = 1
+                    foreach ($colourName in $DotColours.Keys) {
+                        $mark = if ($colourName -eq $marked) { '    current' } else { '' }
+                        Write-Host "    $n) $colourName$mark"
+                        $n++
+                    }
+                    $answer = "$(Read-Host '  Number')".Trim()
+                    if (-not $answer) { continue }
+                    $colourNames = @($DotColours.Keys)
+                    if ($answer -notmatch '^\d+$' -or [int]$answer -lt 1 -or [int]$answer -gt $colourNames.Count) { throw "There is no dot colour $answer." }
+                    $picked = $colourNames[[int]$answer - 1]
+                    $asks = $Mode -eq 'system' -and -not (Test-Admin)
+                    Show-Working "Changing the dot to $picked." $asks
+                    $script:Notes = @()
+                    # A new file each time, deleted once installed (a copy is kept in current\).
+                    $out = Join-Path ([IO.Path]::GetTempPath()) ('betterbird-icons-dot-{0}.ico' -f [guid]::NewGuid().ToString('n'))
+                    $changed = $false
+                    try {
+                        Add-IconDot -Source $base -Dest $out -Hex $DotColours[$picked]
+                        if (-not $asks) { Install-Icon '' $out; $changed = $true }
+                        else { $changed = Invoke-Elevated @{ NewMail = $out } }
+                    }
+                    finally { Remove-Item -LiteralPath $out -Force -ErrorAction SilentlyContinue }
+                    Remove-OldDotFile
+                    Set-MenuResult $changed "Changed the dot to $picked."
+                }
+                '5' {
+                    Clear-Host
+                    $marked = $null
+                    try { $marked = Get-MailPopupName } catch { $marked = $null }
+                    Show-List 'popup' $marked
+                    $answer = "$(Read-Host '  Number')".Trim().Trim('"')
+                    if (-not $answer) { continue }
+                    $picked = Resolve-MenuPopup $answer
+                    [void](Resolve-PopupName $picked)   # a wrong name fails here, before any administrator prompt
+                    $label = Get-PopupLabel (Get-PopupSetName $picked)
+                    $asks = $Mode -eq 'system' -and -not (Test-Admin)
+                    Show-Working "Changing the new-mail popup to $label." $asks
+                    $script:Notes = @()
+                    $changed = $false
+                    if (-not $asks) { Set-MailPopup -Name $picked; $changed = $true }
+                    else { $changed = Invoke-Elevated @{ MailPopup = $picked } }
+                    Set-MenuResult $changed "Changed the new-mail popup to $label."
+                }
+                '6' { Open-IconPage; continue }
+                '7' { Clear-Host; Show-Manual; $pause = $true }
+                '8' {
                     Clear-Host
                     Write-Host ''
                     Write-Host '  Start page:'
@@ -1913,93 +2758,40 @@ function Show-Menu {
                     elseif ($saved -and $answer -eq '4') { Set-StartPage 'Off'; $pause = $true }
                     else { throw "There is no start page choice $answer." }
                 }
-                '3' {
-                    $asks = $Mode -eq 'system' -and -not (Test-Admin)
-                    Show-Working 'Restoring the original icons.' $asks
-                    $script:Notes = @()
-                    $changed = $false
-                    if (-not $asks) { Restore-Originals; $changed = $true }
-                    else { $changed = Invoke-Elevated @{ Restore = $true } }
-                    Set-MenuResult $changed 'Restored the original icons.'
-                }
-                '4' { Clear-Host; Show-Status; $pause = $true }
-                '5' { Clear-Host; Show-Manual; $pause = $true }
-                '6' {
+                '9' { Clear-Host; Show-Status; $pause = $true }
+                { $_ -match '^[Dd]$' } {
                     Clear-Host
-                    $current = $null
-                    if (Test-DataDirTrusted) { $state = Read-State; if ($state -and $state.Icon) { $current = [string]$state.Icon } }
-                    if (-not $current) { throw 'Choose an icon first (option 1). The new-mail icon is updated with that set.' }
-                    Show-List 'newmail'
-                    $answer = "$(Read-Host '  Number, or none for Betterbird''s own')".Trim().Trim('"')
-                    if (-not $answer) { continue }
-                    $mail = if ($answer -eq 'none') { 'none' } else { Resolve-MenuIcon $answer 'newmail' }
-                    $asks = $Mode -eq 'system' -and -not (Test-Admin)
-                    Show-Working 'Changing the new-mail icon.' $asks
-                    $script:Notes = @()
-                    $changed = $false
-                    if (-not $asks) { Install-Icon $current $mail; $changed = $true }
-                    else { $changed = Invoke-Elevated @{ Icon = $current; NewMail = $mail } }
-                    Set-MenuResult $changed 'Changed the new-mail icon.'
+                    Invoke-DebugRestart
+                    $pause = $true
                 }
-                '7' { Open-IconPage; continue }
-                '8' {
+                { $_ -match '^[Rr]$' } {
                     Clear-Host
-                    $current = $null
-                    if (Test-DataDirTrusted) { $state = Read-State; if ($state -and $state.Icon) { $current = [string]$state.Icon } }
-                    if (-not $current) { throw 'Choose an icon first (option 1).' }
-                    $window = Get-WindowIconPath $current
-                    if (-not $window) { throw 'This icon has no window picture to put a dot on.' }
-                    $marked = Get-DotColourName (Get-CurrentNewMailPath $current)
                     Write-Host ''
-                    Write-Host '  Dot colour:'
-                    if (-not $marked) { Write-Host "  Current dot: the set's own colour" }
-                    $n = 1
-                    foreach ($colourName in $DotColours.Keys) {
-                        $mark = if ($colourName -eq $marked) { '    current' } else { '' }
-                        Write-Host "    $n) $colourName$mark"
-                        $n++
-                    }
-                    $answer = "$(Read-Host '  Number')".Trim()
-                    if (-not $answer) { continue }
-                    $colourNames = @($DotColours.Keys)
-                    if ($answer -notmatch '^\d+$' -or [int]$answer -lt 1 -or [int]$answer -gt $colourNames.Count) { throw "There is no dot colour $answer." }
-                    $picked = $colourNames[[int]$answer - 1]
+                    Write-Host '  Revert to Betterbird defaults puts Betterbird back to its own pictures:'
+                    Write-Host '    - removes the icon files from Betterbird''s icon folder, even ones you put there'
+                    Write-Host '      yourself (a copy of those is kept, and you are told where)'
+                    Write-Host '    - gives the Betterbird shortcuts Betterbird''s own icon'
+                    Write-Host '    - puts Betterbird''s own new-mail popup back'
+                    Write-Host '    - puts back the start page you had before this tool changed it'
+                    Write-Host '    - removes this tool''s backups and records'
+                    Write-Host '  Betterbird has to be closed.'
+                    $answer = "$(Read-Host '  Go ahead? (Y/N)')".Trim()
+                    if ($answer -notmatch '^[Yy]') { continue }
                     $asks = $Mode -eq 'system' -and -not (Test-Admin)
-                    Show-Working "Changing the dot to $picked." $asks
+                    Show-Working 'Reverting to Betterbird defaults.' $asks
                     $script:Notes = @()
-                    if (-not $env:LOCALAPPDATA) { throw 'The LocalAppData folder is not set on this computer.' }
-                    $out = Join-Path $env:LOCALAPPDATA 'BetterbirdIcons\dot-newmail.ico'
-                    New-Item -ItemType Directory -Force -Path (Split-Path $out) | Out-Null
-                    Add-IconDot -Source $window -Dest $out -Hex $DotColours[$picked]
                     $changed = $false
-                    if (-not $asks) { Install-Icon $current $out; $changed = $true }
-                    else { $changed = Invoke-Elevated @{ Icon = $current; NewMail = $out } }
-                    Set-MenuResult $changed "Changed the dot to $picked."
+                    if (-not $asks) { Reset-Factory; $changed = $true }
+                    else { $changed = Invoke-Elevated @{ FactoryReset = $true } }
+                    if ($changed) { Reset-StartPageToPrevious; Remove-OldDotFile }
+                    Set-MenuResult $changed 'Reverted to Betterbird defaults.'
                 }
-                '9' {
+                { $_ -match '^[Ss]$' } {
                     Clear-Host
-                    $marked = $null
-                    try { $marked = Get-MailPopupName } catch { $marked = $null }
-                    Write-Host ''
-                    Write-Host '  Mail popup:'
-                    $n = 1
-                    foreach ($popupName in $PopupChoices.Keys) {
-                        $mark = if ($popupName -eq $marked) { '    current' } else { '' }
-                        Write-Host ("    {0}) {1,-10} {2}{3}" -f $n, $PopupLabels[$popupName], $PopupChoices[$popupName], $mark)
-                        $n++
-                    }
-                    $answer = "$(Read-Host '  Number')".Trim()
-                    if (-not $answer) { continue }
-                    $popupNames = @($PopupChoices.Keys)
-                    if ($answer -notmatch '^\d+$' -or [int]$answer -lt 1 -or [int]$answer -gt $popupNames.Count) { throw "There is no mail popup $answer." }
-                    $picked = $popupNames[[int]$answer - 1]
-                    $asks = $Mode -eq 'system' -and -not (Test-Admin)
-                    Show-Working "Changing the mail popup to $($PopupLabels[$picked])." $asks
-                    $script:Notes = @()
-                    $changed = $false
-                    if (-not $asks) { Set-MailPopup -Name $picked; $changed = $true }
-                    else { $changed = Invoke-Elevated @{ MailPopup = $picked } }
-                    Set-MenuResult $changed "Changed the mail popup to $($PopupLabels[$picked])."
+                    $folder = "$(Read-Host '  Betterbird folder (the one with BetterbirdLauncher.exe or betterbird.exe)')".Trim().Trim('"')
+                    if (-not $folder) { continue }
+                    Enter-OwnFolderMode $folder
+                    if (-not (Confirm-StandardUser @{ Portable = $folder })) { return }
                 }
                 { $_ -match '^[Qq]$' } { return }
             }
@@ -2045,13 +2837,29 @@ function Show-CollectedNotes {
 }
 
 function Invoke-Tool($Options) {
+    # Whatever happens, a Betterbird this run closed is started again if asked to, from the user's
+    # own window (the administrator window never gets -RestartBetterbird).
+    try { Invoke-ToolSteps $Options }
+    finally {
+        if ($Options.ContainsKey('RestartBetterbird') -and $Options['RestartBetterbird'] -and -not $Relaunched -and $script:BetterbirdClosed) {
+            $script:BetterbirdClosed = $false
+            [void](Start-Betterbird)
+            Show-CollectedNotes
+        }
+    }
+}
+
+function Invoke-ToolSteps($Options) {
     # Runs the requested actions once the target Betterbird is known. Throws on error.
     $o = @{}
     foreach ($k in $Options.Keys) { $o[$k] = $Options[$k] }
     $iconValue = [string]$o['Icon']; $mailValue = [string]$o['NewMail']; $pageValue = [string]$o['StartPage']
     $popupValue = [string]$o['MailPopup']
     $doRestore = [bool]$o['Restore']
-    $menu = -not ($iconValue -or $mailValue -or $pageValue -or $popupValue -or $doRestore -or $o['List'] -or $o['Status'] -or $o['Manual'])
+    $doFactory = [bool]$o['FactoryReset']
+    $wantRestart = [bool]$o['RestartExplorer']
+    $wantBirdRestart = [bool]$o['RestartBetterbird']
+    $menu = -not ($iconValue -or $mailValue -or $pageValue -or $popupValue -or $doRestore -or $doFactory -or $wantRestart -or $wantBirdRestart -or $o['List'] -or $o['Status'] -or $o['Manual'])
     if ($o['Manual']) { Show-Manual; return }
     if ($o['Status']) { Show-Status; return }
 
@@ -2059,28 +2867,46 @@ function Invoke-Tool($Options) {
         # No admin needed; if elevated, offer to restart de-elevated.
         if (-not (Confirm-StandardUser $Options)) { return }
     }
-    elseif (($iconValue -or $mailValue -or $doRestore -or $popupValue) -and -not (Test-Admin)) {
+    if (-not $menu -and -not $Relaunched) {
+        # Closed here, in the user's own window, so the administrator window finds nothing to close
+        # and Betterbird can be started again from here afterwards.
+        if ($doFactory) { Close-Betterbird 'for a factory reset' }
+        elseif ($wantBirdRestart) {
+            Close-Betterbird $(if ($iconValue -or $mailValue -or $popupValue -or $doRestore -or $pageValue) { 'for the change' } else { 'to restart it' })
+        }
+    }
+    if ($Mode -eq 'system' -and ($iconValue -or $mailValue -or $doRestore -or $doFactory -or $popupValue) -and -not (Test-Admin)) {
         # Only icon actions need admin; the start page runs here, unelevated.
         $elevatedOk = Invoke-Elevated (Get-ElevatedOptions $Options)
         Show-CollectedNotes
         if (-not $elevatedOk) { $script:ToolExit = 1 }
-        if (-not $pageValue) { return }
-        $iconValue = ''; $mailValue = ''; $doRestore = $false; $popupValue = ''
+        if ($elevatedOk -and ($doRestore -or $doFactory)) { Remove-OldDotFile }
+        if ($elevatedOk -and $doFactory) { Reset-StartPageToPrevious; Show-CollectedNotes }
+        if (-not $pageValue) {
+            Complete-Restarts ($elevatedOk -and $wantRestart) $false
+            return
+        }
+        $wantRestart = $wantRestart -and $elevatedOk
+        $iconValue = ''; $mailValue = ''; $doRestore = $false; $doFactory = $false; $popupValue = ''
     }
 
     # Checked before changing anything.
     if ($pageValue -and (Test-Admin)) { throw $NoAdminProfiles }
     if ($Mode -eq 'system' -and (Test-Admin)) { Remove-OldReapplyTask }
     if ($menu) { Show-Menu; return }
-    if ($mailValue -and -not $iconValue) {
-        $state = if (Test-DataDirTrusted) { Read-State } else { $null }
-        if (-not ($state -and $state.Icon)) { throw 'Choose an icon with -Icon as well.' }
-        $iconValue = $state.Icon
-    }
     if ($doRestore) { Restore-Originals }
-    if ($iconValue) { Install-Icon $iconValue $mailValue }
+    if ($doFactory) {
+        Reset-Factory
+        # Relaunched elevated: the window that started this does the start page.
+        if (-not $Relaunched) { Reset-StartPageToPrevious }
+    }
+    if (($doRestore -or $doFactory) -and -not $Relaunched) { Remove-OldDotFile }
+    # Popup before icons: it fails while Betterbird runs, and then nothing should have changed.
     if ($popupValue) { Set-MailPopup -Name $popupValue }
+    if ($iconValue -or $mailValue) { Install-Icon $iconValue $mailValue }
     if ($pageValue) { Set-StartPage $pageValue }
+    # The first window does this; the administrator window it started leaves it to that one.
+    if ($wantRestart -and -not $Relaunched) { Complete-Restarts $true $false }
 }
 
 # ---------------------------------------------------------------- main
@@ -2090,7 +2916,7 @@ if ($MyInvocation.InvocationName -eq '.') { return }
 
 $script:ToolExit = 0
 try {
-    $menuMode = -not ($Icon -or $NewMail -or $MailPopup -or $StartPage -or $Restore -or $List -or $Status -or $Manual)
+    $menuMode = -not ($Icon -or $NewMail -or $MailPopup -or $StartPage -or $Restore -or $FactoryReset -or $RestartExplorer -or $RestartBetterbird -or $List -or $Status -or $Manual)
     $handled = $false
     if ($List) { Show-List; $handled = $true }
 
