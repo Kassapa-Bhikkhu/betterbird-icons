@@ -165,6 +165,7 @@ $NoAdminExplorer = 'Explorer was not restarted: this window runs as administrato
 $NoAdminBetterbird = 'Betterbird was not started again: this window runs as administrator, and Betterbird would then run as administrator too. Start it yourself.'
 $NoAdminDebug = 'This window runs as administrator, and Explorer would then run as administrator too. Run this again from a normal window (for example by double-clicking Set-BetterbirdIcon.cmd).'
 $PopupInUse = 'Betterbird is using that picture. Quit it completely, including the tray icon, then try again.'
+$PopupNeedsClosed = 'Nothing was changed: this also changes the popup, which can only be done with Betterbird closed.'
 
 # 'system': Program Files install, needs admin.
 # 'own':    portable or per-user install, no admin.
@@ -576,10 +577,14 @@ function Request-BetterbirdClosed([string]$StopMessage) {
 function Start-Betterbird {
     # The portable launcher if there is one, else betterbird.exe. Only from the user's own window:
     # started from an administrator window it would run as administrator.
+    # Called from finally blocks, so it never throws: that would hide the error being handled.
     if (Test-Admin) { Write-Warn $NoAdminBetterbird; return $false }
-    $exe = if ($Launcher) { $Launcher } else { Join-Path (Get-InstallDir) 'betterbird.exe' }
-    if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) { Write-Warn "Couldn't find $exe to start Betterbird again. Start it yourself."; return $false }
-    Start-Process -FilePath $exe
+    try {
+        $exe = if ($Launcher) { $Launcher } else { Join-Path (Get-InstallDir) 'betterbird.exe' }
+        if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) { Write-Warn "Couldn't find $exe to start Betterbird again. Start it yourself."; return $false }
+        Start-Process -FilePath $exe
+    }
+    catch { Write-Warn "Couldn't start Betterbird again ($($_.Exception.Message)). Start it yourself."; return $false }
     Write-Done 'Started Betterbird again.'
     $true
 }
@@ -2502,13 +2507,9 @@ function Restart-Explorer {
     return $true
 }
 
-function Complete-Restarts([bool]$Explorer, [bool]$Betterbird) {
-    # Command line, in the user's own window once the change is done: Explorer, then Betterbird.
+function Complete-Restarts([bool]$Explorer) {
+    # Command line, in the user's own window once the change is done.
     if ($Explorer) { [void](Restart-Explorer) }
-    if ($Betterbird -and $script:BetterbirdClosed) {
-        $script:BetterbirdClosed = $false
-        [void](Start-Betterbird)
-    }
     Show-CollectedNotes
 }
 
@@ -2713,7 +2714,7 @@ function Show-Menu {
                     $mail = if ($all) { $null } else { 'keep' }
                     $what = if ($all) { "the icon, the tray icon and the popup to $name" } else { "the standard icon to $name" }
                     # 1 changes the popup, which can't be done while Betterbird holds omni.ja open.
-                    $closed = Request-BetterbirdClosed $(if ($all) { $PopupInUse })
+                    $closed = Request-BetterbirdClosed $(if ($all) { $PopupNeedsClosed })
                     Show-Working "Changing $what." $asks
                     $script:Notes = @()
                     $changed = $false
@@ -2736,7 +2737,7 @@ function Show-Menu {
                 '3' {
                     Clear-Host
                     Show-List 'newmail'
-                    $answer = "$(Read-Host '  Number, or none for Betterbird''s own')".Trim().Trim('"')
+                    $answer = "$(Read-Host '  Number, the path to your own .ico file, or none for Betterbird''s own')".Trim().Trim('"')
                     if (-not $answer) { continue }
                     $mail = if ($answer -eq 'none') { 'none' } else { Resolve-MenuIcon $answer 'newmail' }
                     $asks = $Mode -eq 'system' -and -not (Test-Admin)
@@ -2787,7 +2788,7 @@ function Show-Menu {
                     $marked = $null
                     try { $marked = Get-MailPopupName } catch { $marked = $null }
                     Show-List 'popup' $marked
-                    $answer = "$(Read-Host '  Number')".Trim().Trim('"')
+                    $answer = "$(Read-Host '  Number, or the path to your own .ico file')".Trim().Trim('"')
                     if (-not $answer) { continue }
                     $picked = Resolve-MenuPopup $answer
                     [void](Resolve-PopupName $picked)   # a wrong name fails here, before any administrator prompt
@@ -2956,7 +2957,7 @@ function Invoke-ToolSteps($Options) {
         if ($elevatedOk -and ($doRestore -or $doFactory)) { Remove-OldDotFile }
         if ($elevatedOk -and $doFactory) { Reset-StartPageToPrevious; Show-CollectedNotes }
         if (-not $pageValue) {
-            Complete-Restarts ($elevatedOk -and $wantRestart) $false
+            Complete-Restarts ($elevatedOk -and $wantRestart)
             return
         }
         $wantRestart = $wantRestart -and $elevatedOk
@@ -2979,7 +2980,7 @@ function Invoke-ToolSteps($Options) {
     if ($iconValue -or $mailValue) { Install-Icon $iconValue $mailValue }
     if ($pageValue) { Set-StartPage $pageValue }
     # The first window does this; the administrator window it started leaves it to that one.
-    if ($wantRestart -and -not $Relaunched) { Complete-Restarts $true $false }
+    if ($wantRestart -and -not $Relaunched) { Complete-Restarts $true }
 }
 
 # ---------------------------------------------------------------- main

@@ -1947,12 +1947,12 @@ Describe 'The main menu' {
             $script:bb.Running | Should -BeTrue
         }
 
-        It 'N stops 1 before anything changes, with the popup message' {
+        It 'N stops 1 before anything changes, and says why' {
             $text = Invoke-MenuWith @('1', '1', 'N', '')
             Should -Invoke Invoke-Elevated -Times 0
             Should -Invoke Install-Icon -Times 0
             Should -Invoke Set-MailPopup -Times 0
-            ([regex]::Matches($text, 'Betterbird is using that picture\. Quit it completely, including the tray icon, then try again\.')).Count | Should -Be 1
+            ([regex]::Matches($text, 'Nothing was changed: this also changes the popup, which can only be done with Betterbird closed\.')).Count | Should -Be 1
             $script:bb.Running | Should -BeTrue
             $Mode = 'own'
             Invoke-MenuWith @('1', '1', 'N', '') | Out-Null
@@ -2296,6 +2296,13 @@ Describe 'Closing and starting Betterbird' {
         $Launcher = $launcher
         Start-Betterbird | Should -BeTrue
         Should -Invoke Start-Process -Times 1 -Exactly -ParameterFilter { $FilePath -eq $launcher }
+    }
+
+    It 'warns instead of throwing when Betterbird cannot be started, so it never hides another error' {
+        Mock Start-Process { throw 'Access is denied' }
+        Mock Write-Warn { }
+        { Start-Betterbird | Should -BeFalse } | Should -Not -Throw
+        Should -Invoke Write-Warn -Times 1 -Exactly -ParameterFilter { $Text -like '*Access is denied*Start it yourself*' }
     }
 
     It 'never starts it as administrator, and says so' {
